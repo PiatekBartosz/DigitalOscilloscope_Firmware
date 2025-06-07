@@ -1,0 +1,13 @@
+{
+    "folders": [
+        {
+            "path": "/workspace"
+        },
+        {
+            "path": "/opt/zephyr/zephyr"
+        },
+        {
+            "path": "/opt/zephyr-sdk"
+        }
+    ]
+}

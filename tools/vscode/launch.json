@@ -1,0 +1,27 @@
+{
+  "inputs": [
+    {
+      "id": "ipAddress",
+      "type": "promptString",
+      "description": "Enter target IP address",
+      "default": "192.168.0.27"
+    }
+  ],
+
+  "version": "0.2.0",
+  "configurations": [
+    {
+        "type": "cortex-debug",
+        "cwd" : "${workspaceRoot}",
+        "executable": "_deploy/zephyr.elf",
+        "runToEntryPoint": "main",
+        "name": "debug with OpenOCD",
+        "gdbPath" : "/opt/zephyr-sdk/aarch64-zephyr-elf/bin/aarch64-zephyr-elf-gdb",
+        "servertype" : "external",  
+        "gdbTarget": "${input:ipAddress}:3333",
+        "request" : "attach",
+        "rtos": "zephyr"
+
+    }
+  ],
+}
