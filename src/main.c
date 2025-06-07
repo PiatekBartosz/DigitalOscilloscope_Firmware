@@ -1,7 +1,7 @@
-// #include <zephyr/logging/log.h>
+#include <zephyr/logging/log.h>
 #include <zephyr/kernel.h>
 
-// LOG_MODULE_REGISTER(main); 
+LOG_MODULE_REGISTER(main); 
 
 int main(void)
 {
@@ -10,6 +10,7 @@ int main(void)
     while(1)
     {
        printk("Test %d \n", ++i);
+       k_sleep(K_SECONDS(1));
     }
 
     return 0;

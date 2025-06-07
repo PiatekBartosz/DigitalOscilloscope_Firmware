@@ -3,8 +3,10 @@ BUILD_DIR = _build
 DEPLOY_DIR = _deploy
 
 BOARD = "nucleo_h563zi"
-OVERLAY = "src/boards/stm32h5.overlay"
 
+#TODO: add later
+# OVERLAY = "src/boards/stm32h5.overlay"
+#  -DDTC_OVERLAY_FILE=$(OVERLAY) 
 
 .PHONY: all cmake build clean run rebuild
 
@@ -14,7 +16,7 @@ all: build deploy
 # Build the project
 build:
 	mkdir -p $(BUILD_DIR)
-	cmake -B _build -S . -GNinja -DBOARD=${BOARD} -DDTC_OVERLAY_FILE=$(OVERLAY) && ninja -C _build
+	cmake -B _build -S . -GNinja -DBOARD=${BOARD} && ninja -C _build
 
 # Clean the build directory
 clean:

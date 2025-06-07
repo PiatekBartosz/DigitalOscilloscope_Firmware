@@ -1,0 +1,48 @@
+Program received signal SIGINT, Interrupt.
+0x0800aec2 in atomic_add (target=0x20000790 <dropped_cnt>, value=1) at /opt/zephyr/zephyr/include/zephyr/sys/atomic_builtin.h:41
+41              return __atomic_fetch_add(target, value, __ATOMIC_SEQ_CST);
+(gdb) bt
+#0  0x0800aec2 in atomic_add (target=0x20000790 <dropped_cnt>, value=1) at /opt/zephyr/zephyr/include/zephyr/sys/atomic_builtin.h:41
+#1  0x0800af18 in atomic_inc (target=0x20000790 <dropped_cnt>) at /opt/zephyr/zephyr/include/zephyr/sys/atomic_builtin.h:51
+#2  0x08001568 in z_log_dropped (buffered=false) at /opt/zephyr/zephyr/subsys/logging/log_core.c:615
+#3  0x0800b9bc in z_log_msg_finalize (msg=0x0, source=0x801034c <log_const_os>, desc=..., data=0x0) at /opt/zephyr/zephyr/subsys/logging/log_msg.c:35
+#4  0x08001b42 in z_log_msg_runtime_vcreate (domain_id=0 '\000', source=0x801034c <log_const_os>, level=1 '\001', data=0x0, dlen=0, package_flags=0, fmt=0x801092c "***** HARD FAULT *****", ap=...)
+    at /opt/zephyr/zephyr/subsys/logging/log_msg.c:397
+#5  0x0800bffa in z_log_msg_runtime_create (domain_id=0 '\000', source=0x801034c <log_const_os>, level=1 '\001', data=0x0, dlen=0, package_flags=0, fmt=0x801092c "***** HARD FAULT *****")
+    at /opt/zephyr/zephyr/include/zephyr/logging/log_msg.h:714
+#6  0x08002f64 in hard_fault (esf=0x20003270 <z_interrupt_stacks+1984>, recoverable=0x2000328b <z_interrupt_stacks+2011>) at /opt/zephyr/zephyr/arch/arm/core/cortex_m/fault.c:769
+#7  0x08003200 in fault_handle (esf=0x20003270 <z_interrupt_stacks+1984>, fault=3, recoverable=0x2000328b <z_interrupt_stacks+2011>) at /opt/zephyr/zephyr/arch/arm/core/cortex_m/fault.c:850
+#8  0x08003376 in z_arm_fault (msp=536883888, psp=536883824, exc_return=4294967293, callee_regs=0x20002ab0 <z_interrupt_stacks>) at /opt/zephyr/zephyr/arch/arm/core/cortex_m/fault.c:1119
+#9  0x0800340c in z_arm_usage_fault () at /opt/zephyr/zephyr/arch/arm/core/cortex_m/fault_s.S:102
+#10 <signal handler called>
+#11 0x00006e00 in ?? ()
+#12 0x08006de6 in z_arm_interrupt_stack_setup () at /opt/zephyr/zephyr/arch/arm/include/cortex_m/stack.h:43
+#13 arch_kernel_init () at /opt/zephyr/zephyr/arch/arm/include/cortex_m/kernel_arch_func.h:41
+#14 z_cstart () at /opt/zephyr/zephyr/kernel/init.c:654
+Backtrace stopped: previous frame identical to this frame (corrupt stack?)
+(gdb) c
+Continuing.
+[stm32h723zg.cpu0] clearing lockup after double fault
+
+Program received signal SIGINT, Interrupt.
+0x0800aec2 in atomic_add (target=0x20000790 <dropped_cnt>, value=1) at /opt/zephyr/zephyr/include/zephyr/sys/atomic_builtin.h:41
+41              return __atomic_fetch_add(target, value, __ATOMIC_SEQ_CST);
+(gdb) bt
+#0  0x0800aec2 in atomic_add (target=0x20000790 <dropped_cnt>, value=1) at /opt/zephyr/zephyr/include/zephyr/sys/atomic_builtin.h:41
+#1  0x0800af18 in atomic_inc (target=0x20000790 <dropped_cnt>) at /opt/zephyr/zephyr/include/zephyr/sys/atomic_builtin.h:51
+#2  0x08001568 in z_log_dropped (buffered=false) at /opt/zephyr/zephyr/subsys/logging/log_core.c:615
+#3  0x0800b9bc in z_log_msg_finalize (msg=0x0, source=0x801034c <log_const_os>, desc=..., data=0x0) at /opt/zephyr/zephyr/subsys/logging/log_msg.c:35
+#4  0x08001b42 in z_log_msg_runtime_vcreate (domain_id=0 '\000', source=0x801034c <log_const_os>, level=1 '\001', data=0x0, dlen=0, package_flags=0, fmt=0x801092c "***** HARD FAULT *****", ap=...)
+    at /opt/zephyr/zephyr/subsys/logging/log_msg.c:397
+#5  0x0800bffa in z_log_msg_runtime_create (domain_id=0 '\000', source=0x801034c <log_const_os>, level=1 '\001', data=0x0, dlen=0, package_flags=0, fmt=0x801092c "***** HARD FAULT *****")
+    at /opt/zephyr/zephyr/include/zephyr/logging/log_msg.h:714
+#6  0x08002f64 in hard_fault (esf=0x20003270 <z_interrupt_stacks+1984>, recoverable=0x2000328b <z_interrupt_stacks+2011>) at /opt/zephyr/zephyr/arch/arm/core/cortex_m/fault.c:769
+#7  0x08003200 in fault_handle (esf=0x20003270 <z_interrupt_stacks+1984>, fault=3, recoverable=0x2000328b <z_interrupt_stacks+2011>) at /opt/zephyr/zephyr/arch/arm/core/cortex_m/fault.c:850
+#8  0x08003376 in z_arm_fault (msp=536883888, psp=536883824, exc_return=4294967293, callee_regs=0x20002ab0 <z_interrupt_stacks>) at /opt/zephyr/zephyr/arch/arm/core/cortex_m/fault.c:1119
+#9  0x0800340c in z_arm_usage_fault () at /opt/zephyr/zephyr/arch/arm/core/cortex_m/fault_s.S:102
+#10 <signal handler called>
+#11 0x00006e00 in ?? ()
+#12 0x08006de6 in z_arm_interrupt_stack_setup () at /opt/zephyr/zephyr/arch/arm/include/cortex_m/stack.h:43
+#13 arch_kernel_init () at /opt/zephyr/zephyr/arch/arm/include/cortex_m/kernel_arch_func.h:41
+#14 z_cstart () at /opt/zephyr/zephyr/kernel/init.c:654
+
