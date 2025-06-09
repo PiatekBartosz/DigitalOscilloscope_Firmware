@@ -2,10 +2,10 @@ PROJECT_NAME = main
 BUILD_DIR = _build
 DEPLOY_DIR = _deploy
 
-BOARD = "nucleo_h563zi"
+BOARD = "nucleo_h723zg"
 
 #TODO: add later
-# OVERLAY = "src/boards/stm32h5.overlay"
+# OVERLAY = "src/boards/stm32h7.overlay"
 #  -DDTC_OVERLAY_FILE=$(OVERLAY) 
 
 .PHONY: all cmake build clean run rebuild

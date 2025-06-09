@@ -15,12 +15,14 @@
         "cwd" : "${workspaceRoot}",
         "executable": "_deploy/zephyr.elf",
         "runToEntryPoint": "main",
-        "name": "debug with OpenOCD",
+        "name": "Debug with OpenOCD",
         "gdbPath" : "/opt/zephyr-sdk/aarch64-zephyr-elf/bin/aarch64-zephyr-elf-gdb",
         "servertype" : "external",  
         "gdbTarget": "${input:ipAddress}:3333",
         "request" : "attach",
-        "rtos": "zephyr"
+        "rtos": "zephyr",
+        "showDevDebugOutput": "raw",
+        "svdPath": "/workspace/tools/svd/STM32H723.svd"
 
     }
   ],
