@@ -21,7 +21,6 @@
         "gdbTarget": "${input:ipAddress}:3333",
         "request" : "attach",
         "rtos": "zephyr",
-        "showDevDebugOutput": "raw",
         "svdPath": "/workspace/tools/svd/STM32H723.svd"
 
     }

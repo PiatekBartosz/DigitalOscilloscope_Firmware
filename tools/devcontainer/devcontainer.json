@@ -4,7 +4,7 @@
         "../docker-compose.yaml"
     ],
     "service": "zephyr-dev",
-    "remoteUser": "zephyrdev",
+    "remoteUser": "dev",
     "workspaceFolder": "/workspace",
     "customizations": {
         "vscode": {
