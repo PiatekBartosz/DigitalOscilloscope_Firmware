@@ -5,12 +5,11 @@ LOG_MODULE_REGISTER(main);
 
 int main(void)
 {
-    int i = 10;
+    printk("Hello world from oscilocope project!\n");
 
     while(1)
     {
-       printk("Test %d \n", ++i);
-       k_sleep(K_SECONDS(1));
+        k_sleep(K_SECONDS(10));
     }
 
     return 0;
