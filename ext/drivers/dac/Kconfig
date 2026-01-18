@@ -1,0 +1,26 @@
+menuconfig DAC
+	bool "Digital-to-Analog Converter (DAC) drivers"
+	help
+	  Enable DAC (Digital to Analog Converter) driver configuration.
+
+if DAC
+
+module = DAC
+module-str = DAC
+source "subsys/logging/Kconfig.template.log_config"
+
+config DAC_SHELL
+	bool "DAC shell"
+	depends on SHELL
+	help
+	  Enable DAC related shell commands.
+
+config DAC_INIT_PRIORITY
+	int "DAC init priority"
+	default KERNEL_INIT_PRIORITY_DEVICE
+	help
+	  DAC driver device initialization priority.
+
+rsource "Kconfig.dacx1408"
+
+endif # DAC

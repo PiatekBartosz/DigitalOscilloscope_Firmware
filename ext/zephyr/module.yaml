@@ -1,0 +1,5 @@
+name: external_drivers_module
+build:
+  cmake: drivers
+  kconfig: drivers/Kconfig
+  

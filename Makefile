@@ -4,6 +4,8 @@ DEPLOY_DIR = _deploy
 
 BOARD = "nucleo_h723zg"
 
+EXT_MODULE = $(PWD)/ext
+
 #TODO: add later
 # OVERLAY = "src/boards/stm32h7.overlay"
 #  -DDTC_OVERLAY_FILE=$(OVERLAY) 
@@ -16,7 +18,9 @@ all: build deploy
 # Build the project
 build:
 	mkdir -p $(BUILD_DIR)
-	cmake -B _build -S . -GNinja -DBOARD=${BOARD} && ninja -C _build
+	export ZEPHYR_EXTRA_MODULES=$(EXT_MODULE) && \
+	cmake -B $(BUILD_DIR) -S . -GNinja -DBOARD=${BOARD} && \
+	ninja -C $(BUILD_DIR)
 
 # Clean the build directory
 clean:
