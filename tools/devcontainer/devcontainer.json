@@ -3,7 +3,7 @@
     "dockerComposeFile": [
         "../docker-compose.yaml"
     ],
-    "service": "zephyr-dev",
+    "service": "digital-oscilloscope-firmware",
     "remoteUser": "dev",
     "workspaceFolder": "/workspace",
     "customizations": {

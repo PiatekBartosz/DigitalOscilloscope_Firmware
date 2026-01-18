@@ -5,9 +5,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 
-# TODO: update to 4.x.x
-ARG ZEPHYR_SDK_VERSION=0.17.1
-ARG ZEPHYR_VERSION_TAG=v3.7.0
+ARG ZEPHYR_SDK_VERSION=0.17.4
+ARG ZEPHYR_VERSION_TAG=v4.2.1
 
 # Install common dependencies and Zephyr requirements
 RUN apt-get update && \
@@ -15,7 +14,7 @@ RUN apt-get update && \
     git cmake ninja-build gperf ccache dfu-util device-tree-compiler wget \
     python3-dev python3-pip python3-setuptools python3-tk python3-wheel xz-utils file \
     make gcc gcc-multilib g++-multilib libsdl2-dev libmagic1 \
-    python3-venv ca-certificates sudo vim git-lfs \
+    python3-venv ca-certificates sudo vim git-lfs clangd clang-formatter \
     # Dependencies for specific native_sim targets if needed (e.g., GUI)
     # libglib2.0-dev libpixman-1-dev
     && apt-get clean \
@@ -71,7 +70,8 @@ RUN west update
 # Export Zephyr CMake package (makes Zephyr findable by CMake)
 RUN west zephyr-export
 # Install Python dependencies for Zephyr and its modules
-RUN pip3 install --user --no-cache-dir -r ${ZEPHYR_BASE}/scripts/requirements.txt
+RUN python3 -m pip install --upgrade pip setuptools wheel && \
+    pip install --user --no-cache-dir --prefer-binary --use-feature=fast-deps -r ${ZEPHYR_BASE}/scripts/requirements.txt
 
 # Set up .bashrc for the user
 # This ensures the Zephyr environment is activated on login and west is in PATH

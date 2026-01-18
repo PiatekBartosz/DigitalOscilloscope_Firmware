@@ -1,13 +1,10 @@
 services:
-  zephyr-dev:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        ZEPHYR_SDK_VERSION: "0.17.1"
-        ZEPHYR_VERSION_TAG: "v3.7.0"
-    image: zephyr-dev-env:latest
-    container_name: zephyr_dev_container
+  digital-oscilloscope-firmware:
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+    image: piatekbartosz/digital-oscilloscope-firmware:1.0.0
+    container_name: digital-oscilloscope-firmware
     volumes:
       - ./:/workspace
 
