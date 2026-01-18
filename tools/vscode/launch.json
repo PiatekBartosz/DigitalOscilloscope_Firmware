@@ -19,10 +19,9 @@
         "gdbPath" : "/opt/zephyr-sdk/aarch64-zephyr-elf/bin/aarch64-zephyr-elf-gdb",
         "servertype" : "external",  
         "gdbTarget": "${input:ipAddress}:3333",
-        "request" : "attach",
+        "request": "launch",
         "rtos": "zephyr",
         "svdPath": "/workspace/tools/svd/STM32H723.svd"
-
     }
-  ],
+  ]
 }
