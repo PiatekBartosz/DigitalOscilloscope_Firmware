@@ -1,12 +1,27 @@
-description: TI DACx1408 DAC controller
+include: base.yaml
 
-compatible: "ti,dacx1408"
+description: TI DACx1408 12 to 16 bit ADC.
 
-include: dac-controller.yaml
+compatible: "ti,dacx0501"
 
 properties:
-  reg:
+  voltage-reference:
+    type: string
     required: true
+    enum:
+      - "internal"
+      - "external"
+    description: |
+      DAC voltage reference select: either internal (2.5 V) or external
 
-  "#io-channel-cells":
-    const: 1
+  output-gain:
+    type: string
+    required: true
+    enum:
+      - "mul2"
+      - "mul1"
+      - "div2"
+    description: |
+      This setting can be used to control the output voltage range within the supported bit
+      resolution. mul2 will double the output range but lower the resolution, while div2 will
+      lower the range but double the resolution.

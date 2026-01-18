@@ -2,4 +2,6 @@ name: external_drivers_module
 build:
   cmake: drivers
   kconfig: drivers/Kconfig
-  
+  settings:
+    board_root: . 
+    dts_root: .

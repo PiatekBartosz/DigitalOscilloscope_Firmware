@@ -2,13 +2,8 @@ PROJECT_NAME = main
 BUILD_DIR = _build
 DEPLOY_DIR = _deploy
 
-BOARD = "nucleo_h723zg"
-
+BOARD = "nucleo_h723zg_dev"
 EXT_MODULE = $(PWD)/ext
-
-#TODO: add later
-# OVERLAY = "src/boards/stm32h7.overlay"
-#  -DDTC_OVERLAY_FILE=$(OVERLAY) 
 
 .PHONY: all cmake build clean run rebuild
 

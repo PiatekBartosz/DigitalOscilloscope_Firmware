@@ -2,7 +2,7 @@ config DAC_DACX1408
 	bool "TI DACx1408 DAC driver"
 	default y
 	depends on DT_HAS_TI_DACX1408_ENABLED
-	select I2C
+	select SPI
 	help
 	  Enable the driver for the TI DACx1408.
 
@@ -12,6 +12,6 @@ config DAC_DACX1408_INIT_PRIORITY
 	int "Init priority"
 	default 80
 	help
-	  TI DACx1408 DAC device driver initialization priority. Must be greater than I2C_INIT_PRIORITY.
+	  TI DACx1408 DAC device driver initialization priority. Must be greater than SPI_INIT_PRIORITY.
 
 endif # DAC_DACX1408
