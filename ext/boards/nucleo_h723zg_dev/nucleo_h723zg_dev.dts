@@ -214,10 +214,18 @@ zephyr_udc0: &usbotg_hs {
 	status = "okay";
 };
 
-&fdcan1 {
-	pinctrl-0 = <&fdcan1_rx_pd0 &fdcan1_tx_pd1>;
-	pinctrl-names = "default";
-	clocks = <&rcc STM32_CLOCK_BUS_APB1_2 0x00000100>,
-		 <&rcc STM32_SRC_PLL2_Q FDCAN_SEL(2)>;
-	status = "okay";
-};
+spi_dac61408: dacdac61408@0 {
+	compatible = "ti,dac60508";
+	reg = <0x0>;
+	spi-max-frequency = <0>;
+	#io-channel-cells = <1>;
+	voltage-reference = <0>;
+	channel0-gain = <0>;
+	channel1-gain = <0>;
+	channel2-gain = <0>;
+	channel3-gain = <0>;
+	channel4-gain = <0>;
+	channel5-gain = <0>;
+	channel6-gain = <0>;
+	channel7-gain = <0>;
+}

@@ -10,7 +10,7 @@ properties:
     description: |
       DAC voltage reference select
 
-      See constants in dt-bindings/dac/dacx1408.h.
+      See constants in dt-bindings/dac/dacx0508.h.
 
   channel0-gain:
     type: int
@@ -18,7 +18,7 @@ properties:
     description: |
       Channel 0 gain select
 
-      See constants in dt-bindings/dac/dacx1408.h.
+      See constants in dt-bindings/dac/dacx0508.h.
 
   channel1-gain:
     type: int
@@ -26,7 +26,7 @@ properties:
     description: |
       Channel 1 gain select
 
-      See constants in dt-bindings/dac/dacx1408.h.
+      See constants in dt-bindings/dac/dacx0508.h.
 
   channel2-gain:
     type: int
@@ -34,7 +34,7 @@ properties:
     description: |
       Channel 2 gain select
 
-      See constants in dt-bindings/dac/dacx1408.h.
+      See constants in dt-bindings/dac/dacx0508.h.
 
   channel3-gain:
     type: int
@@ -42,7 +42,7 @@ properties:
     description: |
       Channel 3 gain select
 
-      See constants in dt-bindings/dac/dacx1408.h.
+      See constants in dt-bindings/dac/dacx0508.h.
 
   channel4-gain:
     type: int
@@ -50,7 +50,7 @@ properties:
     description: |
       Channel 4 gain select
 
-      See constants in dt-bindings/dac/dacx1408.h.
+      See constants in dt-bindings/dac/dacx0508.h.
 
   channel5-gain:
     type: int
@@ -58,7 +58,7 @@ properties:
     description: |
       Channel 5 gain select
 
-      See constants in dt-bindings/dac/dacx1408.h.
+      See constants in dt-bindings/dac/dacx0508.h.
 
   channel6-gain:
     type: int
@@ -66,7 +66,7 @@ properties:
     description: |
       Channel 6 gain select
 
-      See constants in dt-bindings/dac/dacx1408.h.
+      See constants in dt-bindings/dac/dacx0508.h.
 
   channel7-gain:
     type: int
@@ -74,7 +74,7 @@ properties:
     description: |
       Channel 7 gain select
 
-      See constants in dt-bindings/dac/dacx1408.h.
+      See constants in dt-bindings/dac/dacx0508.h.
 
   "#io-channel-cells":
     const: 1
