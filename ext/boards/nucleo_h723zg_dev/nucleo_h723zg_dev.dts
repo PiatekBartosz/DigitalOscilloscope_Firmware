@@ -72,6 +72,22 @@
 		pwm-led0 = &red_pwm_led;
 		sw0 = &user_button;
 	};
+
+	spi_dac61408: dac61408@0 {
+		compatible = "ti,dac61408";
+		reg = <0x0 0x1>;
+		spi-max-frequency = <0>;
+		#io-channel-cells = <1>;
+		voltage-reference = <0>;
+		channel0-gain = <0>;
+		channel1-gain = <0>;
+		channel2-gain = <0>;
+		channel3-gain = <0>;
+		channel4-gain = <0>;
+		channel5-gain = <0>;
+		channel6-gain = <0>;
+		channel7-gain = <0>;
+	};
 };
 
 &clk_lsi {
@@ -213,19 +229,3 @@ zephyr_udc0: &usbotg_hs {
 &rng {
 	status = "okay";
 };
-
-spi_dac61408: dacdac61408@0 {
-	compatible = "ti,dac60508";
-	reg = <0x0>;
-	spi-max-frequency = <0>;
-	#io-channel-cells = <1>;
-	voltage-reference = <0>;
-	channel0-gain = <0>;
-	channel1-gain = <0>;
-	channel2-gain = <0>;
-	channel3-gain = <0>;
-	channel4-gain = <0>;
-	channel5-gain = <0>;
-	channel6-gain = <0>;
-	channel7-gain = <0>;
-}
