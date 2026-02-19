@@ -1,0 +1,17 @@
+config DAC_DAC61408
+	bool "TI DAC_DAC61408 DAC driver"
+	default y
+	depends on DT_HAS_TI_DAC61408_ENABLED
+	select SPI
+	help
+	  Enable the driver for the TI DAC_DAC61408.
+
+if DAC_DAC61408
+
+config DAC_DAC61408_INIT_PRIORITY
+	int "Init priority"
+	default 80
+	help
+	  TI DAC_DAC61408 DAC device driver initialization priority. Must be greater than SPI_INIT_PRIORITY.
+
+endif # DAC_DAC61408

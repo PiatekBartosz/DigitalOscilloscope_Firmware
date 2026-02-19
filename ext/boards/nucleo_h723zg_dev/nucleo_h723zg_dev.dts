@@ -72,22 +72,6 @@
 		pwm-led0 = &red_pwm_led;
 		sw0 = &user_button;
 	};
-
-	spi_dac61408: dac61408@0 {
-		compatible = "ti,dac61408";
-		reg = <0x0 0x1>;
-		spi-max-frequency = <0>;
-		#io-channel-cells = <1>;
-		voltage-reference = <0>;
-		channel0-gain = <0>;
-		channel1-gain = <0>;
-		channel2-gain = <0>;
-		channel3-gain = <0>;
-		channel4-gain = <0>;
-		channel5-gain = <0>;
-		channel6-gain = <0>;
-		channel7-gain = <0>;
-	};
 };
 
 &clk_lsi {
@@ -171,6 +155,19 @@
 	pinctrl-0 = <&spi1_sck_pa5 &spi1_miso_pa6 &spi1_mosi_pb5>;
 	pinctrl-names = "default";
 	cs-gpios = <&gpiod 14 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+
+	spi_dac61408: dac61408@0 {
+		compatible = "ti,dac61408";
+		status = "okay";
+
+		reg = <0x0>;
+
+		spi-max-frequency = <1000000>;
+		#io-channel-cells = <1>;
+		
+		voltage-reference = <0>;
+		channel-gains = <0 0 0 0 0 0 0 0>;
+	};
 };
 
 &i2c1 {
