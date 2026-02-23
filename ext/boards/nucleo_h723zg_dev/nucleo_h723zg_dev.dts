@@ -162,7 +162,11 @@
 
 		reg = <0x0>;
 
+		clr-gpios = <&gpiof 9  (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+		reset-gpios = <&gpiof 8 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+
 		spi-max-frequency = <1000000>;
+		spi-cpha;
 		#io-channel-cells = <1>;
 		
 		voltage-reference = <0>;

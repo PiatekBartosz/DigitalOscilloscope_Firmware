@@ -1,10 +1,13 @@
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/spi.h>
+#include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/dac.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/byteorder.h>
 
 LOG_MODULE_REGISTER(dac_dac61408, CONFIG_DAC_LOG_LEVEL);
+
+#define DT_DRV_COMPAT ti_dac61408
 
 /* ============================================================
  * Register Offsets
@@ -167,91 +170,145 @@ LOG_MODULE_REGISTER(dac_dac61408, CONFIG_DAC_LOG_LEVEL);
 
 #define DAC61408_OFFSET_AB_MASK          (0xFFU << DAC61408_OFFSET_AB_OFFSET)
 #define DAC61408_OFFSET_CD_MASK          (0xFFU << DAC61408_OFFSET_CD_OFFSET)
-
-typedef enum Voltage_Reference_Source_e {
+typedef enum
+{
 	REF_INTERNAL = 0,
 	REF_EXTERNAL = 1,
 } Voltage_Reference_Source_t;
 
-typedef struct Dac61408_Config_s {
+typedef struct
+{
 	struct spi_dt_spec bus;
+	struct gpio_dt_spec clearGpio;
+	struct gpio_dt_spec resetGpio;
 	uint8_t reference;
 } Dac61408_Config_t;
 
-typedef struct Dac61408_Data_t_s {
+typedef struct
+{
 	uint8_t resolution;
 } Dac61408_Data_t;
 
+/* ============================================================
+ * Low Level SPI Access
+ * ============================================================ */
+
 static int dac61408_reg_write(const struct device *dev,
-			      uint8_t addr,
-			      uint16_t data)
+							  uint8_t addr,
+							  uint16_t data)
+{
+	const Dac61408_Config_t *config = dev->config;
+
+	uint8_t tx_buf[3] = {0};
+	uint8_t rx_buf[3] = {0};
+
+	/* Bit7 = 0 for WRITE */
+	tx_buf[0] = addr & 0x7F;
+	sys_put_be16(data, &tx_buf[1]);
+
+	int ret = spi_transceive_dt(&config->bus, &tx_buf, &rx_buf);
+	if (ret)
+	{
+		LOG_ERR("SPI write failed (%d)", ret);
+		return ret;
+	}
+
+	// second transaction is required
+	// ret = spi_transceive_dt(&config->bus, &tx_buf, &rx_buf);
+	// if (ret)
+	// {
+	// 	LOG_ERR("SPI write failed (%d)", ret);
+	// 	return ret;
+	// }
+
+	LOG_DBG("RD RAW send: 0x%02X 0x%02X 0x%02X", tx_buf[0], tx_buf[1], tx_buf[2]);
+	LOG_DBG("RD RAW recv: 0x%02X 0x%02X 0x%02X", rx_buf[0], rx_buf[1], rx_buf[2]);
+
+	// TODO: compare rx and tx and throw when it's bad
+
+	return 0;
+}
+
+static int dac61408_reg_read(const struct device *dev,
+							 uint8_t addr,
+							 uint16_t *data)
 {
 	const Dac61408_Config_t *config = dev->config;
 
 	uint8_t tx_buf[3];
-	tx_buf[0] = addr;
-	sys_put_be16(data, &tx_buf[1]);
+	uint8_t rx_buf[3] = {0};
 
-	struct spi_buf buf = {
-		.buf = tx_buf,
-		.len = sizeof(tx_buf),
-	};
+	/* Bit7 = 1 for READ */
+	tx_buf[0] = addr | 0x80;
+	tx_buf[1] = 0x00;
+	tx_buf[2] = 0x00;
 
-	struct spi_buf_set tx = {
-		.buffers = &buf,
-		.count = 1,
-	};
+	struct spi_buf txb = {.buf = tx_buf, .len = sizeof(tx_buf)};
+	struct spi_buf rxb = {.buf = rx_buf, .len = sizeof(rx_buf)};
 
-	return spi_write_dt(&config->bus, &tx);
-}
-
-static int dac61408_reg_read(const struct device *dev,
-			     uint8_t addr,
-			     uint16_t *data)
-{
-	const Dac61408_Config_t *config = dev->config;
-
-	uint8_t tx_buf[3] = { addr, 0x00, 0x00 };
-	uint8_t rx_buf[3];
-
-	struct spi_buf txb = {
-		.buf = tx_buf,
-		.len = sizeof(tx_buf),
-	};
-
-	struct spi_buf rxb = {
-		.buf = rx_buf,
-		.len = sizeof(rx_buf),
-	};
-
-	struct spi_buf_set tx = { .buffers = &txb, .count = 1 };
-	struct spi_buf_set rx = { .buffers = &rxb, .count = 1 };
+	struct spi_buf_set tx = {.buffers = &txb, .count = 1};
+	struct spi_buf_set rx = {.buffers = &rxb, .count = 1};
 
 	int ret = spi_transceive_dt(&config->bus, &tx, &rx);
 	if (ret)
+	{
+		LOG_ERR("SPI read failed (%d)", ret);
 		return ret;
+	}
+
+	// second transaction is required
+	ret = spi_transceive_dt(&config->bus, &tx, &rx);
+	if (ret)
+	{
+		LOG_ERR("SPI read failed (%d)", ret);
+		return ret;
+	}
 
 	*data = sys_get_be16(&rx_buf[1]);
+
+	LOG_DBG("RD RAW send: 0x%02X 0x%02X 0x%02X", tx_buf[0], tx_buf[1], tx_buf[2]);
+	LOG_DBG("RD RAW recv: 0x%02X 0x%02X 0x%02X", rx_buf[0], rx_buf[1], rx_buf[2]);
+
 	return 0;
 }
 
+static int dac61408_reg_update_bits(const struct device *dev,
+									uint8_t addr,
+									uint16_t mask,
+									uint16_t value)
+{
+	uint16_t tmp;
+	int ret = dac61408_reg_read(dev, addr, &tmp);
+	if (ret)
+		return ret;
+
+	tmp &= ~mask;
+	tmp |= (value & mask);
+
+	return dac61408_reg_write(dev, addr, tmp);
+}
+
+/* ============================================================
+ * DAC API
+ * ============================================================ */
+
 static int dac61408_channel_setup(const struct device *dev,
-				  const struct dac_channel_cfg *channel_cfg)
+								  const struct dac_channel_cfg *cfg)
 {
 	Dac61408_Data_t *data = dev->data;
 
-	if (channel_cfg->channel_id > 7)
+	if (cfg->channel_id > 7)
 		return -EINVAL;
 
-	if (channel_cfg->resolution != data->resolution)
+	if (cfg->resolution != data->resolution)
 		return -ENOTSUP;
 
 	return 0;
 }
 
 static int dac61408_write_value(const struct device *dev,
-				uint8_t channel,
-				uint32_t value)
+								uint8_t channel,
+								uint32_t value)
 {
 	Dac61408_Data_t *data = dev->data;
 
@@ -264,80 +321,128 @@ static int dac61408_write_value(const struct device *dev,
 	uint16_t reg_val = value << (16 - data->resolution);
 
 	return dac61408_reg_write(dev,
-				  DAC61408_REG_DAC(channel),
-				  reg_val);
+							  DAC61408_REG_DAC(channel),
+							  reg_val);
 }
+
+/* ============================================================
+ * Init
+ * ============================================================ */
 
 static int dac61408_init(const struct device *dev)
 {
 	const Dac61408_Config_t *config = dev->config;
 	Dac61408_Data_t *data = dev->data;
-	uint16_t device_id = 0u;
-	int ret = 0;
+	uint16_t device_id;
+	uint16_t status;
+	int ret;
 
-	if (!spi_is_ready_dt(&config->bus))
+	LOG_INF("Initializing DAC61408...");
+
+	if (!gpio_is_ready_dt(&config->clearGpio) ||
+		!gpio_is_ready_dt(&config->resetGpio) ||
+		!spi_is_ready_dt(&config->bus))
+	{
+		LOG_ERR("Device not ready");
 		return -ENODEV;
+	}
 
+	gpio_pin_configure_dt(&config->clearGpio, GPIO_OUTPUT_INACTIVE);
+	gpio_pin_configure_dt(&config->resetGpio, GPIO_OUTPUT_INACTIVE);
+
+	/* Soft reset */
 	ret = dac61408_reg_write(dev,
-				 DAC61408_REG_TRIGGER,
-				 DAC61408_TRIG_SOFT_RESET_CODE);
+							 DAC61408_REG_TRIGGER,
+							 DAC61408_TRIG_SOFT_RESET_CODE);
 	if (ret)
 		return ret;
 
 	k_msleep(5);
 
-	ret = dac61408_reg_read(dev,
-				DAC61408_REG_DEVICEID,
-				&device_id);
+	/* Enable SDO so reads work */
+	ret = dac61408_reg_update_bits(dev,
+								   DAC61408_REG_SPICONFIG,
+								   DAC61408_SPI_SDO_EN_MASK,
+								   DAC61408_SPI_SDO_EN_MASK);
 	if (ret)
 		return ret;
+
+	LOG_INF("SDO enabled");
+
+	/* Read device ID */
+	ret = dac61408_reg_read(dev,
+							DAC61408_REG_DEVICEID,
+							&device_id);
+	if (ret)
+		return ret;
+
+	LOG_INF("Device ID: 0x%04X", device_id);
+
+	/* Read status */
+	ret = dac61408_reg_read(dev,
+							DAC61408_REG_STATUS,
+							&status);
+	if (!ret)
+		LOG_INF("STATUS: 0x%04X", status);
 
 	data->resolution = 12;
 
+	/* Configure reference */
 	uint16_t genconfig = 0;
 
 	if (config->reference == REF_EXTERNAL)
+	{
 		genconfig |= DAC61408_GEN_REF_PWDWN_MASK;
+		LOG_INF("External reference selected");
+	}
+	else
+	{
+		LOG_INF("Internal reference selected");
+	}
 
 	ret = dac61408_reg_write(dev,
-				 DAC61408_REG_GENCONFIG,
-				 genconfig);
+							 DAC61408_REG_GENCONFIG,
+							 genconfig);
 	if (ret)
 		return ret;
 
+	/* Power up all DACs */
 	ret = dac61408_reg_write(dev,
-				 DAC61408_REG_DACPWDWN,
-				 0x0000);
+							 DAC61408_REG_DACPWDWN,
+							 0x0000);
 	if (ret)
 		return ret;
+
+	LOG_INF("DAC61408 initialization complete");
 
 	return 0;
 }
+
+/* ============================================================
+ * Driver API
+ * ============================================================ */
 
 static DEVICE_API(dac, dac61408_driver_api) = {
 	.channel_setup = dac61408_channel_setup,
 	.write_value = dac61408_write_value,
 };
 
-#define DT_DRV_COMPAT ti_dac61408
-
-#define DAC61408_DEFINE(inst)                                      		\
-	static Dac61408_Data_t dac61408_data_##inst;              		\
-	static const Dac61408_Config_t                            		\
-	dac61408_config_##inst = {                                     		\
-		.reference = DT_INST_PROP_OR(inst, voltage_reference, 0), 		\
-		.bus = SPI_DT_SPEC_INST_GET(inst,                           	\
-					     SPI_WORD_SET(8) |            					\
-					     SPI_TRANSFER_MSB,              				\
-					     0),                            				\
-	};                                                              	\
-	DEVICE_DT_INST_DEFINE(inst,                                     	\
-			      dac61408_init,                          				\
-			      NULL,                                   				\
-			      &dac61408_data_##inst,                  				\
-			      &dac61408_config_##inst,                				\
-			      POST_KERNEL,                            				\
-			      CONFIG_DAC_DAC61408_INIT_PRIORITY,      				\
-			      &dac61408_driver_api);
+#define DAC61408_DEFINE(inst)                                               \
+	static Dac61408_Data_t dac61408_data_##inst;                            \
+	static const Dac61408_Config_t dac61408_config_##inst = {               \
+		.reference = DT_INST_PROP_OR(inst, voltage_reference, 0),           \
+		.clearGpio = GPIO_DT_SPEC_GET(DT_DRV_INST(inst), clr_gpios),        \
+		.resetGpio = GPIO_DT_SPEC_GET(DT_DRV_INST(inst), reset_gpios),      \
+		.bus = SPI_DT_SPEC_INST_GET(inst,                                   \
+									SPI_WORD_SET(8) | SPI_TRANSFER_MSB, 0), \
+	};                                                                      \
+	DEVICE_DT_INST_DEFINE(inst,                                             \
+						  dac61408_init,                                    \
+						  NULL,                                             \
+						  &dac61408_data_##inst,                            \
+						  &dac61408_config_##inst,                          \
+						  POST_KERNEL,                                      \
+						  CONFIG_DAC_DAC61408_INIT_PRIORITY,                \
+						  &dac61408_driver_api);
 
 DT_INST_FOREACH_STATUS_OKAY(DAC61408_DEFINE)

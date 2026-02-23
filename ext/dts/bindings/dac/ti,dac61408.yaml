@@ -19,3 +19,15 @@ properties:
 
   "#io-channel-cells":
     const: 1
+
+  clr-gpios:
+    type: phandle-array
+    description: |
+      CLR input pin, active low.
+    required: true
+
+  reset-gpios:
+    type: phandle-array
+    description: |
+      RESET input pin, active low.
+    required: true
