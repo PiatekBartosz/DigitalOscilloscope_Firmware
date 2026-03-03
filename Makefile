@@ -5,6 +5,8 @@ DEPLOY_DIR = _deploy
 BOARD = "nucleo_h723zg_dev"
 EXT_MODULE = $(PWD)/ext
 
+JOBS := $(shell nproc)
+
 .PHONY: all cmake build clean run rebuild
 
 # Default target: build the project
@@ -15,7 +17,7 @@ build:
 	mkdir -p $(BUILD_DIR)
 	export ZEPHYR_EXTRA_MODULES=$(EXT_MODULE) && \
 	cmake -B $(BUILD_DIR) -S . -GNinja -DBOARD=${BOARD} && \
-	ninja -C $(BUILD_DIR)
+	ninja -C $(BUILD_DIR) -j$(JOBS)
 	echo "Build done!"
 
 # Clean the build directory
