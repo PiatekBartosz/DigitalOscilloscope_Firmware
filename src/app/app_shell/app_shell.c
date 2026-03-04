@@ -26,5 +26,17 @@ static int app_shell_fooCmd(const struct shell *sh, size_t argc,
 
 int app_shell_init(void)
 {
-    return 0;
+    int errorCode = 0;
+    do
+    {
+        if (!device_is_ready(app_shell_config.shellDev))
+        {
+            LOG_ERR("Device not ready");
+            errorCode = -ENODEV;
+            break;
+        }
+
+    } while (0);
+
+    return errorCode;
 }
