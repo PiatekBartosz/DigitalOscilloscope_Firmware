@@ -11,17 +11,17 @@ extern "C" {
 #include <stdbool.h>
 #include <stdint.h>
 
-    /* Macros */
+/* Macros */
 
-    /* Type Definitions */
+/* Type Definitions */
 
-    /* Function Prototypes */
+/* Function Prototypes */
 
-    int afe_manager_init(void);
+int afe_manager_init(void);
 
-    // TODO: do getters
-    int afe_manager_setGain(const uint8_t channel, const double set_percent);
-    int afe_manager_setOffset(const uint8_t channel, const double set_percent);
+// TODO: do getters
+int afe_manager_setGain(const uint8_t channel, const double set_percent);
+int afe_manager_setOffset(const uint8_t channel, const double set_percent);
 
 #ifdef __cplusplus
 }

@@ -1,5 +1,7 @@
 #include "app.h"
 #include "afe_manager/afe_manager.h"
+#include "app_shell/app_shell.h"
+
 #include <zephyr/logging/log.h>
 #include <zephyr/kernel.h>
 
@@ -27,6 +29,12 @@ int app_init(void)
         if (errorCode != 0)
         {
             LOG_ERR("Error initalizing afe manager: %d", errorCode);
+        }
+
+        errorCode = app_shell_init();
+        if (errorCode != 0)
+        {
+            LOG_ERR("Error initalizing app shell: %d", errorCode);
         }
 
         while (true)

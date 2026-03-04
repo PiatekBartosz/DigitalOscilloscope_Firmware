@@ -14,6 +14,7 @@ target_sources(
     src/main.c
     ${APP_SRC_PATH}/app.c
     ${APP_SRC_PATH}/afe_manager/afe_manager.c
+    ${APP_SRC_PATH}/app_shell/app_shell.c
 )
 
 target_include_directories(
