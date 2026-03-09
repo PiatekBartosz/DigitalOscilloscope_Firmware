@@ -181,6 +181,7 @@ typedef enum
 {
 	REF_INTERNAL = 0,
 	REF_EXTERNAL = 1,
+
 } Voltage_Reference_Source_t;
 
 typedef struct
@@ -189,11 +190,13 @@ typedef struct
 	struct gpio_dt_spec clearGpio;
 	struct gpio_dt_spec resetGpio;
 	uint8_t reference;
+
 } Dac61408_Config_t;
 
 typedef struct
 {
 	uint8_t resolution;
+
 } Dac61408_Data_t;
 
 /* ============================================================

@@ -25,13 +25,31 @@ LOG_MODULE_REGISTER(afe_manager);
 typedef struct afe_manager_config_s
 {
     const struct device *const dacDev;
+    const struct gpio_dt_spec attenuationCh1Gpio;
+    const struct gpio_dt_spec attenuationCh2Gpio;
+    const struct gpio_dt_spec couplingCh1Gpio;
+    const struct gpio_dt_spec couplingCh2Gpio;
+    const struct gpio_dt_spec couplingTriggerGpio;
+    const struct gpio_dt_spec interleavedGpio;
 
 } afe_manager_config_t;
+
+// TODO: add data struct and use it to get data of dac settings
 
 /* Private Variables */
 
 static afe_manager_config_t afe_manager_config = {
     .dacDev = DEVICE_DT_GET(DT_ALIAS(dac0)),
+
+    .attenuationCh1Gpio = GPIO_DT_SPEC_GET(DT_NODELABEL(attenuation_ch1), gpios),
+    .attenuationCh2Gpio = GPIO_DT_SPEC_GET(DT_NODELABEL(attenuation_ch2), gpios),
+
+    .couplingCh1Gpio = GPIO_DT_SPEC_GET(DT_NODELABEL(coupling_ch1), gpios),
+    .couplingCh2Gpio = GPIO_DT_SPEC_GET(DT_NODELABEL(coupling_ch2), gpios),
+
+    .couplingTriggerGpio = GPIO_DT_SPEC_GET(DT_NODELABEL(coupling_trigger), gpios),
+
+    .interleavedGpio = GPIO_DT_SPEC_GET(DT_NODELABEL(interleaved), gpios),
 };
 
 /* Private Function Prototypes */
@@ -40,7 +58,44 @@ static afe_manager_config_t afe_manager_config = {
 
 static int afe_manager_initGpio(void)
 {
-    return 0;
+    int errorCode = 0;
+
+    const struct gpio_dt_spec *gpios[] = {
+        &afe_manager_config.attenuationCh1Gpio,
+        &afe_manager_config.attenuationCh2Gpio,
+        &afe_manager_config.couplingCh1Gpio,
+        &afe_manager_config.couplingCh2Gpio,
+        &afe_manager_config.couplingTriggerGpio,
+        &afe_manager_config.interleavedGpio};
+    do
+    {
+        for (size_t i = 0; i < ARRAY_SIZE(gpios); i++)
+        {
+            if (!device_is_ready(gpios[i]->port))
+            {
+                errorCode = -ENODEV;
+                LOG_ERR("Gpio device %d is not ready", errorCode);
+                break;
+            }
+        }
+        if (errorCode != 0)
+        {
+            break;
+        }
+
+        for (size_t i = 0; i < ARRAY_SIZE(gpios); i++)
+        {
+            errorCode = gpio_pin_configure_dt(gpios[i], GPIO_OUTPUT_INACTIVE);
+            if (errorCode != 0)
+            {
+                LOG_ERR("Device %d cannot be configured", errorCode);
+                break;
+            }
+        }
+
+    } while (0);
+
+    return errorCode;
 }
 
 static int afe_manager_initDac(void)
@@ -121,10 +176,12 @@ int afe_manager_init(void)
     return errorCode;  
 }
 
-int afe_manager_setGain(const uint8_t channel, const double set_percent)
+int afe_manager_setGain(const afe_manager_channel_t channel, const float percent)
 {
-    const uint32_t rawValue = afe_manager_encodeDac(set_percent);
     int errorCode = 0;
+    uint32_t rawValue = 0;
+    uint8_t absoluteChannel = 0;
+
     do
     {
         if (!afe_manager_isChannelValid(channel))
@@ -133,23 +190,31 @@ int afe_manager_setGain(const uint8_t channel, const double set_percent)
             break;
         }
 
-        const uint8_t absoluteChannel = (channel == AFE_MANGER_DAC_CH1) ? AFE_MANGER_DAC_GAIN_CH1 : AFE_MANGER_DAC_GAIN_CH2;
-        errorCode = dac_write_value(afe_manager_config.dacDev, absoluteChannel, rawValue);
+        rawValue = afe_manager_encodeDac(percent);
+
+        absoluteChannel =
+            (channel == AFE_MANAGER_CH1) ? AFE_MANGER_DAC_GAIN_CH1 : AFE_MANGER_DAC_GAIN_CH2;
+
+        errorCode = dac_write_value(afe_manager_config.dacDev,
+                                    absoluteChannel,
+                                    rawValue);
         if (errorCode != 0)
         {
-            LOG_ERR("Cannot write to dac, error: %d", errorCode);
+            LOG_ERR("Failed to set gain DAC value, error: %d", errorCode);
             break;
         }
 
-    } while(0);
+    } while (0);
 
     return errorCode;
 }
 
-int afe_manager_setOffset(const uint8_t channel, const double set_percent)
+int afe_manager_setOffset(const afe_manager_channel_t channel, const float percent)
 {
-    const uint32_t rawValue = afe_manager_encodeDac(set_percent);
     int errorCode = 0;
+    uint32_t rawValue = 0;
+    uint8_t absoluteChannel = 0;
+
     do
     {
         if (!afe_manager_isChannelValid(channel))
@@ -158,15 +223,102 @@ int afe_manager_setOffset(const uint8_t channel, const double set_percent)
             break;
         }
 
-        const uint8_t absoluteChannel = (channel == AFE_MANGER_DAC_CH1) ? AFE_MANGER_DAC_OFFSET_CH1 : AFE_MANGER_DAC_OFFSET_CH2;
-        errorCode = dac_write_value(afe_manager_config.dacDev, absoluteChannel, rawValue);
+        rawValue = afe_manager_encodeDac(percent);
+
+        absoluteChannel =
+            (channel == AFE_MANAGER_CH1) ? AFE_MANGER_DAC_OFFSET_CH1 : AFE_MANGER_DAC_OFFSET_CH2;
+
+        errorCode = dac_write_value(afe_manager_config.dacDev,
+                                    absoluteChannel,
+                                    rawValue);
         if (errorCode != 0)
         {
-            LOG_ERR("Cannot write to dac, error: %d", errorCode);
+            LOG_ERR("Failed to set offset DAC value, error: %d", errorCode);
             break;
         }
 
-    } while(0);
+    } while (0);
+
+    return errorCode;
+}
+
+int afe_manager_setAttenuation(const afe_manager_channel_t channel,
+                               const afe_manager_attenuation_t attenuation)
+{
+    int errorCode = 0;
+    const struct gpio_dt_spec *gpio = NULL;
+
+    do
+    {
+        if (!afe_manager_isChannelValid(channel))
+        {
+            errorCode = -EINVAL;
+            break;
+        }
+
+        gpio = (channel == AFE_MANAGER_CH1)
+                   ? &afe_manager_config.attenuationCh1Gpio
+                   : &afe_manager_config.attenuationCh2Gpio;
+
+        errorCode = gpio_pin_set_dt(gpio,
+                                    (attenuation == AFE_MANAGER_ATTEN_1_TO_100) ? 1 : 0);
+        if (errorCode != 0)
+        {
+            LOG_ERR("Failed to set attenuation, error: %d", errorCode);
+            break;
+        }
+
+    } while (0);
+
+    return errorCode;
+}
+
+int afe_manager_setCoupling(const afe_manager_channel_t channel,
+                            const afe_manager_coupling_t coupling)
+{
+    int errorCode = 0;
+    const struct gpio_dt_spec *gpio = NULL;
+
+    do
+    {
+        if (!afe_manager_isChannelValid(channel))
+        {
+            errorCode = -EINVAL;
+            break;
+        }
+
+        gpio = (channel == AFE_MANAGER_CH1)
+                   ? &afe_manager_config.couplingCh1Gpio
+                   : &afe_manager_config.couplingCh2Gpio;
+
+        errorCode = gpio_pin_set_dt(gpio,
+                                    (coupling == AFE_MANAGER_COUPLING_DC) ? 1 : 0);
+        if (errorCode != 0)
+        {
+            LOG_ERR("Failed to set coupling, error: %d", errorCode);
+            break;
+        }
+
+    } while (0);
+
+    return errorCode;
+}
+
+int afe_manager_setTriggerCoupling(const afe_manager_coupling_t coupling)
+{
+    int errorCode = 0;
+
+    do
+    {
+        errorCode = gpio_pin_set_dt(&afe_manager_config.couplingTriggerGpio,
+                                    (coupling == AFE_MANAGER_COUPLING_DC) ? 1 : 0);
+        if (errorCode != 0)
+        {
+            LOG_ERR("Failed to set trigger coupling, error: %d", errorCode);
+            break;
+        }
+
+    } while (0);
 
     return errorCode;
 }
