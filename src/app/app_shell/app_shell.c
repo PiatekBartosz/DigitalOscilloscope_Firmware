@@ -266,6 +266,37 @@ static int app_shell_cmdAfeTrigger(const struct shell *shell, size_t argc, char 
     return errorCode;
 }
 
+static int app_shell_cmdAfeInterleaved(const struct shell *shell, size_t argc, char **argv)
+{
+    app_shell_debugPrintCmd(shell, argc, argv);
+
+    int errorCode = 0;
+    int value = 0;
+
+    do
+    {
+        value = atoi(argv[1]);
+
+        if (value != 0 && value != 1)
+        {
+            shell_error(shell, "Value must be 0 or 1");
+            errorCode = -EINVAL;
+            break;
+        }
+
+        errorCode = afe_manager_setInterleaved(value ? true : false);
+        if (errorCode != 0)
+        {
+            shell_error(shell, "Failed to set interleaved (%d)", errorCode);
+            break;
+        }
+
+        shell_print(shell, "Interleaved %s", value ? "enabled" : "disabled");
+
+    } while (0);
+
+    return errorCode;
+}
 
 /* Command tree */
 
@@ -276,6 +307,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
     SHELL_CMD_ARG(atten, NULL, "atten <ch> <1|100>", app_shell_cmdAfeAtten, 3, 0),
     SHELL_CMD_ARG(coupling, NULL, "coupling <ch> <ac|dc>", app_shell_cmdAfeCoupling, 3, 0),
     SHELL_CMD_ARG(trigger, NULL, "trigger <ac|dc>", app_shell_cmdAfeTrigger, 2, 0),
+    SHELL_CMD_ARG(interleaved, NULL, "interleaved <true|false>", app_shell_cmdAfeInterleaved, 2, 0),
     SHELL_SUBCMD_SET_END);
 
 SHELL_STATIC_SUBCMD_SET_CREATE(

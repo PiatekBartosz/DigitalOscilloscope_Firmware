@@ -319,3 +319,22 @@ int afe_manager_setTriggerCoupling(const afe_manager_coupling_t coupling)
 
     return errorCode;
 }
+
+int afe_manager_setInterleaved(const bool isInterleaved)
+{
+    int errorCode = 0;
+
+    do
+    {
+        errorCode = gpio_pin_set_dt(&afe_manager_config.interleavedGpio,
+                                    isInterleaved ? 1 : 0);
+        if (errorCode != 0)
+        {
+            LOG_ERR("Failed to set interleaved gpio, error: %d", errorCode);
+            break;
+        }
+
+    } while (0);
+
+    return errorCode;
+}

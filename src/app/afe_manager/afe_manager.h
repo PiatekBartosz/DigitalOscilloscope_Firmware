@@ -45,6 +45,7 @@ int afe_manager_setOffset(const afe_manager_channel_t channel, const float perce
 int afe_manager_setAttenuation(const afe_manager_channel_t channel, const afe_manager_attenuation_t attenuation);
 int afe_manager_setCoupling(const afe_manager_channel_t channel, const afe_manager_coupling_t coupling);
 int afe_manager_setTriggerCoupling(const afe_manager_coupling_t coupling);
+int afe_manager_setInterleaved(const bool isInterleaved);
 
 #ifdef __cplusplus
 }
