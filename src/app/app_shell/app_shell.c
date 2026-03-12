@@ -6,6 +6,18 @@
 
 /* Private helpers */
 
+static void app_shell_debugPrintCmd(const struct shell *shell, size_t argc, char **argv)
+{
+    shell_fprintf(shell, SHELL_NORMAL, "CMD:");
+
+    for (size_t i = 0; i < argc; i++)
+    {
+        shell_fprintf(shell, SHELL_NORMAL, " %s", argv[i]);
+    }
+
+    shell_fprintf(shell, SHELL_NORMAL, "\n");
+}
+
 static int app_shell_parseChannel(const char *arg, afe_manager_channel_t *channel)
 {
     int errorCode = 0;
@@ -89,9 +101,10 @@ static int app_shell_parseAttenuation(const char *arg, afe_manager_attenuation_t
 
 static int app_shell_cmdAfeGain(const struct shell *shell, size_t argc, char **argv)
 {
+    app_shell_debugPrintCmd(shell, argc, argv);
     int errorCode = 0;
-    afe_manager_channel_t channel;
-    float percent;
+    afe_manager_channel_t channel = AFE_MANAGER_CH1;
+    float percent = 0.0f;
 
     do
     {
@@ -111,7 +124,7 @@ static int app_shell_cmdAfeGain(const struct shell *shell, size_t argc, char **a
             break;
         }
 
-        shell_print(shell, "Gain set CH%d -> %.2f%%", channel + 1, percent);
+        shell_print(shell, "Gain set CH%d -> %.2f%%", (int)channel + 1, (double)percent);
 
     } while (0);
 
@@ -120,9 +133,10 @@ static int app_shell_cmdAfeGain(const struct shell *shell, size_t argc, char **a
 
 static int app_shell_cmdAfeOffset(const struct shell *shell, size_t argc, char **argv)
 {
+    app_shell_debugPrintCmd(shell, argc, argv);
     int errorCode = 0;
-    afe_manager_channel_t channel;
-    float percent;
+    afe_manager_channel_t channel = AFE_MANAGER_CH1;
+    float percent = 0.0f;
 
     do
     {
@@ -142,7 +156,7 @@ static int app_shell_cmdAfeOffset(const struct shell *shell, size_t argc, char *
             break;
         }
 
-        shell_print(shell, "Offset set CH%d -> %.2f%%", channel + 1, percent);
+        shell_print(shell, "Offset set CH%d -> %.2f%%", (int)channel + 1, (double)percent);
 
     } while (0);
 
@@ -151,9 +165,10 @@ static int app_shell_cmdAfeOffset(const struct shell *shell, size_t argc, char *
 
 static int app_shell_cmdAfeAtten(const struct shell *shell, size_t argc, char **argv)
 {
+    app_shell_debugPrintCmd(shell, argc, argv);
     int errorCode = 0;
-    afe_manager_channel_t channel;
-    afe_manager_attenuation_t attenuation;
+    afe_manager_channel_t channel = AFE_MANAGER_CH1;
+    afe_manager_attenuation_t attenuation = AFE_MANAGER_ATTEN_1_TO_1;
 
     do
     {
@@ -178,7 +193,7 @@ static int app_shell_cmdAfeAtten(const struct shell *shell, size_t argc, char **
             break;
         }
 
-        shell_print(shell, "Attenuation set CH%d", channel + 1);
+        shell_print(shell, "Attenuation set CH%d", channel);
 
     } while (0);
 
@@ -187,9 +202,10 @@ static int app_shell_cmdAfeAtten(const struct shell *shell, size_t argc, char **
 
 static int app_shell_cmdAfeCoupling(const struct shell *shell, size_t argc, char **argv)
 {
+    app_shell_debugPrintCmd(shell, argc, argv);
     int errorCode = 0;
-    afe_manager_channel_t channel;
-    afe_manager_coupling_t coupling;
+    afe_manager_channel_t channel = AFE_MANAGER_CH1;
+    afe_manager_coupling_t coupling = AFE_MANAGER_CH1;
 
     do
     {
@@ -214,7 +230,7 @@ static int app_shell_cmdAfeCoupling(const struct shell *shell, size_t argc, char
             break;
         }
 
-        shell_print(shell, "Coupling set CH%d", channel + 1);
+        shell_print(shell, "Coupling set CH%d", channel);
 
     } while (0);
 
@@ -223,8 +239,9 @@ static int app_shell_cmdAfeCoupling(const struct shell *shell, size_t argc, char
 
 static int app_shell_cmdAfeTrigger(const struct shell *shell, size_t argc, char **argv)
 {
+    app_shell_debugPrintCmd(shell, argc, argv);
     int errorCode = 0;
-    afe_manager_coupling_t coupling;
+    afe_manager_coupling_t coupling = AFE_MANAGER_COUPLING_AC;
 
     do
     {
@@ -248,6 +265,7 @@ static int app_shell_cmdAfeTrigger(const struct shell *shell, size_t argc, char 
 
     return errorCode;
 }
+
 
 /* Command tree */
 

@@ -51,32 +51,32 @@
 		status = "okay";
 
 		attenuation_ch1: attenuation_ch1 {
-			gpios = <&gpioa 0 GPIO_ACTIVE_HIGH>;
+			gpios = <&gpiof 7 GPIO_ACTIVE_HIGH>;
 			label = "AFE_ATTENUATION_CH1";
 		};
 
 		attenuation_ch2: attenuation_ch2 {
-			gpios = <&gpioa 1 GPIO_ACTIVE_HIGH>;
+			gpios = <&gpiob 3 GPIO_ACTIVE_HIGH>;
 			label = "AFE_ATTENUATION_CH2";
 		};
 
 		coupling_ch1: coupling_ch1 {
-			gpios = <&gpioa 2 GPIO_ACTIVE_HIGH>;
+			gpios = <&gpiob 4 GPIO_ACTIVE_HIGH>;
 			label = "AFE_COUPLING_CH1";
 		};
 
 		coupling_ch2: coupling_ch2 {
-			gpios = <&gpioa 3 GPIO_ACTIVE_HIGH>;
+			gpios = <&gpioc 7 GPIO_ACTIVE_HIGH>;
 			label = "AFE_COUPLING_CH2";
 		};
 
 		coupling_trigger: coupling_trigger {
-			gpios = <&gpioa 4 GPIO_ACTIVE_HIGH>;
+			gpios = <&gpioa 0 GPIO_ACTIVE_HIGH>;
 			label = "AFE_COUPLING_TRIGGER";
 		};
 
 		interleaved: interleaved {
-			gpios = <&gpioa 5 GPIO_ACTIVE_HIGH>;
+			gpios = <&gpiog 0 GPIO_ACTIVE_HIGH>;
 			label = "AFE_INTERLEAVED";
 		};
 	};

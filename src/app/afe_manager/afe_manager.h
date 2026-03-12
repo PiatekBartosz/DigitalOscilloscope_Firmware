@@ -31,8 +31,8 @@ typedef enum afe_manager_attenuation_e
 
 typedef enum afe_manager_channel_e
 {
-    AFE_MANAGER_CH1 = 0,
-    AFE_MANAGER_CH2 = 1,
+    AFE_MANAGER_CH1 = 1,
+    AFE_MANAGER_CH2 = 2,
 
 } afe_manager_channel_t;
 

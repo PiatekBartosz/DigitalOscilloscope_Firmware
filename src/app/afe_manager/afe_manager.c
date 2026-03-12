@@ -17,9 +17,6 @@ LOG_MODULE_REGISTER(afe_manager);
 #define AFE_MANGER_DAC_OFFSET_CH1 2u
 #define AFE_MANGER_DAC_OFFSET_CH2 3u
 
-#define AFE_MANGER_DAC_CH1 1u
-#define AFE_MANGER_DAC_CH2 2u
-
 /* Private Types */
 
 typedef struct afe_manager_config_s
@@ -135,12 +132,12 @@ static double afe_manager_decodeDac(const uint32_t value)
     return scaled * (AFE_MANGER_DAC_LIMIT_HIGH_DOUBLE - AFE_MANGER_DAC_LIMIT_LOW_DOUBLE);
 }
 
-static bool afe_manager_isChannelValid(const uint8_t channel)
+static bool afe_manager_isChannelValid(const afe_manager_channel_t channel)
 {
     bool isValid = true;
-    if ((channel != AFE_MANGER_DAC_CH1) || (channel != AFE_MANGER_DAC_CH2))
+    if ((channel != AFE_MANAGER_CH1) && (channel != AFE_MANAGER_CH2))
     {
-        LOG_ERR("Channel can be either %u or %u", AFE_MANGER_DAC_CH1, AFE_MANGER_DAC_CH2);
+        LOG_ERR("Channel can be either %u or %u", AFE_MANAGER_CH1, AFE_MANAGER_CH2);
         isValid = false;
     }
 
