@@ -1,15 +1,11 @@
 #ifndef AFE_MANAGER_H
 #define AFE_MANAGER_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /* Includes */
-#include <stdio.h>
-#include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 /* Macros */
 
@@ -36,6 +32,22 @@ typedef enum afe_manager_channel_e
 
 } afe_manager_channel_t;
 
+/* Current AFE settings — readable by the TCP server */
+typedef struct afe_manager_channel_state_s
+{
+    float gain_percent;
+    float offset_percent;
+    afe_manager_attenuation_t attenuation;
+    afe_manager_coupling_t coupling;
+} afe_manager_channel_state_t;
+
+typedef struct afe_manager_state_s
+{
+    afe_manager_channel_state_t ch[2]; /* index 0 = CH1, 1 = CH2 */
+    afe_manager_coupling_t trigger_coupling;
+    bool interleaved;
+} afe_manager_state_t;
+
 /* Function Prototypes */
 
 int afe_manager_init(void);
@@ -47,8 +59,7 @@ int afe_manager_setCoupling(const afe_manager_channel_t channel, const afe_manag
 int afe_manager_setTriggerCoupling(const afe_manager_coupling_t coupling);
 int afe_manager_setInterleaved(const bool isInterleaved);
 
-#ifdef __cplusplus
-}
-#endif
+/* Returns a snapshot of the current AFE configuration. */
+afe_manager_state_t afe_manager_getState(void);
 
 #endif /* AFE_MANAGER_H */

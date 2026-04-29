@@ -8,4 +8,6 @@ services:
     volumes:
       - ./:/workspace
 
+    network_mode: host
+
     command: sleep infinity

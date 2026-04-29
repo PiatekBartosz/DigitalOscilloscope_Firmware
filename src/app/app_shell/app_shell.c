@@ -1,6 +1,6 @@
-#include <zephyr/shell/shell.h>
 #include <stdlib.h>
 #include <string.h>
+#include <zephyr/shell/shell.h>
 
 #include "afe_manager/afe_manager.h"
 
@@ -205,7 +205,7 @@ static int app_shell_cmdAfeCoupling(const struct shell *shell, size_t argc, char
     app_shell_debugPrintCmd(shell, argc, argv);
     int errorCode = 0;
     afe_manager_channel_t channel = AFE_MANAGER_CH1;
-    afe_manager_coupling_t coupling = AFE_MANAGER_CH1;
+    afe_manager_coupling_t coupling = AFE_MANAGER_COUPLING_AC;
 
     do
     {
@@ -300,19 +300,17 @@ static int app_shell_cmdAfeInterleaved(const struct shell *shell, size_t argc, c
 
 /* Command tree */
 
-SHELL_STATIC_SUBCMD_SET_CREATE(
-    app_shell_afe_cmds,
-    SHELL_CMD_ARG(gain, NULL, "gain <ch> <percent>", app_shell_cmdAfeGain, 3, 0),
-    SHELL_CMD_ARG(offset, NULL, "offset <ch> <percent>", app_shell_cmdAfeOffset, 3, 0),
-    SHELL_CMD_ARG(atten, NULL, "atten <ch> <1|100>", app_shell_cmdAfeAtten, 3, 0),
-    SHELL_CMD_ARG(coupling, NULL, "coupling <ch> <ac|dc>", app_shell_cmdAfeCoupling, 3, 0),
-    SHELL_CMD_ARG(trigger, NULL, "trigger <ac|dc>", app_shell_cmdAfeTrigger, 2, 0),
-    SHELL_CMD_ARG(interleaved, NULL, "interleaved <true|false>", app_shell_cmdAfeInterleaved, 2, 0),
-    SHELL_SUBCMD_SET_END);
+SHELL_STATIC_SUBCMD_SET_CREATE(app_shell_afe_cmds,
+                               SHELL_CMD_ARG(gain, NULL, "gain <ch> <percent>", app_shell_cmdAfeGain, 3, 0),
+                               SHELL_CMD_ARG(offset, NULL, "offset <ch> <percent>", app_shell_cmdAfeOffset, 3, 0),
+                               SHELL_CMD_ARG(atten, NULL, "atten <ch> <1|100>", app_shell_cmdAfeAtten, 3, 0),
+                               SHELL_CMD_ARG(coupling, NULL, "coupling <ch> <ac|dc>", app_shell_cmdAfeCoupling, 3, 0),
+                               SHELL_CMD_ARG(trigger, NULL, "trigger <ac|dc>", app_shell_cmdAfeTrigger, 2, 0),
+                               SHELL_CMD_ARG(interleaved, NULL, "interleaved <true|false>", app_shell_cmdAfeInterleaved,
+                                             2, 0),
+                               SHELL_SUBCMD_SET_END);
 
-SHELL_STATIC_SUBCMD_SET_CREATE(
-    app_shell_cmds,
-    SHELL_CMD(afe, &app_shell_afe_cmds, "AFE control", NULL),
-    SHELL_SUBCMD_SET_END);
+SHELL_STATIC_SUBCMD_SET_CREATE(app_shell_cmds, SHELL_CMD(afe, &app_shell_afe_cmds, "AFE control", NULL),
+                               SHELL_SUBCMD_SET_END);
 
 SHELL_CMD_REGISTER(app, &app_shell_cmds, "Application commands", NULL);

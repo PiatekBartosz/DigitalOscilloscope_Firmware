@@ -7,7 +7,11 @@ EXT_MODULE = $(PWD)/ext
 
 JOBS := $(shell nproc)
 
-.PHONY: all cmake build clean run rebuild
+CLANG_FORMAT  ?= clang-format
+FORMAT_DIRS    = src
+FORMAT_PATTERN = \( -name "*.c" -o -name "*.h" \)
+
+.PHONY: all cmake build clean run rebuild format format-check
 
 # Default target: build the project
 all: build deploy
@@ -34,3 +38,13 @@ deploy: build
 # Rebuild the project from scratch
 rebuild: clean all
 	echo "Rebuild done!"
+
+# Format all C/H sources in-place
+format:
+	find $(FORMAT_DIRS) $(FORMAT_PATTERN) -print0 | xargs -0 $(CLANG_FORMAT) -i
+	echo "Format done!"
+
+# Check formatting without modifying files (useful in CI)
+format-check:
+	find $(FORMAT_DIRS) $(FORMAT_PATTERN) -print0 | xargs -0 $(CLANG_FORMAT) --dry-run --Werror
+	echo "Format check passed!"

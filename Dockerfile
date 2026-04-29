@@ -14,7 +14,7 @@ RUN apt-get update && \
     git cmake ninja-build gperf ccache dfu-util device-tree-compiler wget \
     python3-dev python3-pip python3-setuptools python3-tk python3-wheel xz-utils file \
     make gcc gcc-multilib g++-multilib libsdl2-dev libmagic1 \
-    python3-venv ca-certificates sudo vim git-lfs clangd clang-formatter \
+    python3-venv ca-certificates sudo vim git-lfs clangd clang-format \
     # Dependencies for specific native_sim targets if needed (e.g., GUI)
     # libglib2.0-dev libpixman-1-dev
     && apt-get clean \

@@ -1,0 +1,53 @@
+---
+Language: Cpp
+BasedOnStyle: LLVM
+
+# Indentation
+IndentWidth:              4
+TabWidth:                 4
+UseTab:                   Never
+ContinuationIndentWidth:  4
+IndentCaseLabels:         true
+
+# Line length
+ColumnLimit: 120
+
+# Brace style: Allman (every opening brace on its own line)
+BreakBeforeBraces: Allman
+
+# Short constructs – keep expanded for readability in embedded code
+AllowShortBlocksOnASingleLine:     Never
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortFunctionsOnASingleLine:  None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine:      false
+
+# Pointer / reference alignment
+PointerAlignment:   Right
+ReferenceAlignment: Right
+
+# Spaces
+SpaceBeforeParens:        ControlStatements
+SpaceAfterCStyleCast:     false
+SpaceInEmptyParentheses:  false
+SpacesInParentheses:      false
+SpacesInSquareBrackets:   false
+
+# Alignment
+AlignConsecutiveMacros:       AcrossEmptyLines
+AlignConsecutiveAssignments:  false
+AlignConsecutiveDeclarations: false
+AlignTrailingComments:        true
+
+# Includes: preserve manual grouping, sort within each group
+IncludeBlocks: Preserve
+SortIncludes:  CaseSensitive
+
+# Line breaks
+MaxEmptyLinesToKeep:              2
+KeepEmptyLinesAtTheStartOfBlocks: false
+ReflowComments:                   false
+
+# Trailing comma in macros (common in Zephyr SHELL_CMD lists etc.)
+# Leave macro formatting mostly alone
+AlignEscapedNewlines: Left

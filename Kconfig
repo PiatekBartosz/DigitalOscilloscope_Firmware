@@ -1,0 +1,11 @@
+mainmenu "Digital Oscilloscope"
+
+config PLINK_DEBUG
+	bool "Parallel link debug verification"
+	default n
+	help
+	  On startup, read the FPGA device ID register and verify it matches
+	  the expected value (0x0ADC). Logs an error and returns -EIO if the
+	  handshake fails.
+
+source "Kconfig.zephyr"

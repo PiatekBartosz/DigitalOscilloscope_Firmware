@@ -30,12 +30,9 @@
 	leds: leds {
 		compatible = "gpio-leds";
 
-		green_led: led_0 {
-			gpios = <&gpiob 0 GPIO_ACTIVE_HIGH>;
-			label = "User LD1";
-		};
+		/* PB0 remapped to fpga-ctrl1; green LED unavailable */
 
-		yellow_led: led_1 {
+yellow_led: led_1 {
 			gpios = <&gpioe 1 GPIO_ACTIVE_HIGH>;
 			label = "User LD2";
 		};
@@ -101,12 +98,82 @@
 	};
 
 	aliases {
-		led0 = &green_led;
-		led1 = &yellow_led;
+		led0 = &yellow_led;
 		led2 = &red_led;
 		pwm-led0 = &red_pwm_led;
 		sw0 = &user_button;
 		dac0 = &spi_dac61408;
+
+        /* MCU → FPGA: CTRL bus (8 pins, [2:0]=OP, [7:3]=PAYLOAD) */
+        fpga-ctrl0 = &fpga_ctrl0_node;
+        fpga-ctrl1 = &fpga_ctrl1_node;
+        fpga-ctrl2 = &fpga_ctrl2_node;
+        fpga-ctrl3 = &fpga_ctrl3_node;
+        fpga-ctrl4 = &fpga_ctrl4_node;
+        fpga-ctrl5 = &fpga_ctrl5_node;
+        fpga-ctrl6 = &fpga_ctrl6_node;
+        fpga-ctrl7 = &fpga_ctrl7_node;
+
+        /* MCU → FPGA: direction and strobe */
+        fpga-rw     = &fpga_rw_node;
+        fpga-req    = &fpga_req_node;
+
+        /* FPGA → MCU: DATA bus (14 pins) */
+        fpga-data0  = &fpga_data0_node;
+        fpga-data1  = &fpga_data1_node;
+        fpga-data2  = &fpga_data2_node;
+        fpga-data3  = &fpga_data3_node;
+        fpga-data4  = &fpga_data4_node;
+        fpga-data5  = &fpga_data5_node;
+        fpga-data6  = &fpga_data6_node;
+        fpga-data7  = &fpga_data7_node;
+        fpga-data8  = &fpga_data8_node;
+        fpga-data9  = &fpga_data9_node;
+        fpga-data10 = &fpga_data10_node;
+        fpga-data11 = &fpga_data11_node;
+        fpga-data12 = &fpga_data12_node;
+        fpga-data13 = &fpga_data13_node;
+
+        /* FPGA → MCU: handshake and interrupt */
+        fpga-ack    = &fpga_ack_node;
+        fpga-irq    = &fpga_irq_node;
+	};
+
+	fpga_parallel: fpga_parallel {
+		compatible = "gpio-leds";
+		status = "okay";
+
+		/* CTRL bus — outputs */
+		fpga_ctrl0_node: fpga-ctrl0 { gpios = <&gpiob 11 GPIO_ACTIVE_HIGH>; };
+		fpga_ctrl1_node: fpga-ctrl1 { gpios = <&gpiob 0 GPIO_ACTIVE_HIGH>; };
+		fpga_ctrl2_node: fpga-ctrl2 { gpios = <&gpioe 14 GPIO_ACTIVE_HIGH>; };
+		fpga_ctrl3_node: fpga-ctrl3 { gpios = <&gpiod 2 GPIO_ACTIVE_HIGH>; };
+		fpga_ctrl4_node: fpga-ctrl4 { gpios = <&gpiod 15 GPIO_ACTIVE_HIGH>; };
+		fpga_ctrl5_node: fpga-ctrl5 { gpios = <&gpioe 9 GPIO_ACTIVE_HIGH>; };
+		fpga_ctrl6_node: fpga-ctrl6 { gpios = <&gpioe 11 GPIO_ACTIVE_HIGH>; };
+		fpga_ctrl7_node: fpga-ctrl7 { gpios = <&gpioe 13 GPIO_ACTIVE_HIGH>; };
+
+		fpga_rw_node:  fpga-rw  { gpios = <&gpioe 8 GPIO_ACTIVE_HIGH>; };
+		fpga_req_node: fpga-req { gpios = <&gpioe 7 GPIO_ACTIVE_HIGH>; };
+
+		/* DATA bus — inputs */
+		fpga_data0_node:  fpga-data0  { gpios = <&gpiod 1 GPIO_ACTIVE_HIGH>; };
+		fpga_data1_node:  fpga-data1  { gpios = <&gpiod 0 GPIO_ACTIVE_HIGH>; };
+		fpga_data2_node:  fpga-data2  { gpios = <&gpioe 6 GPIO_ACTIVE_HIGH>; };
+		fpga_data3_node:  fpga-data3  { gpios = <&gpioe 5 GPIO_ACTIVE_HIGH>; };
+		fpga_data4_node:  fpga-data4  { gpios = <&gpioe 4 GPIO_ACTIVE_HIGH>; };
+		fpga_data5_node:  fpga-data5  { gpios = <&gpiod 3 GPIO_ACTIVE_HIGH>; };
+		fpga_data6_node:  fpga-data6  { gpios = <&gpiod 4 GPIO_ACTIVE_HIGH>; };
+		fpga_data7_node:  fpga-data7  { gpios = <&gpiod 5 GPIO_ACTIVE_HIGH>; };
+		fpga_data8_node:  fpga-data8  { gpios = <&gpiod 6 GPIO_ACTIVE_HIGH>; };
+		fpga_data9_node:  fpga-data9  { gpios = <&gpiod 7 GPIO_ACTIVE_HIGH>; };
+		fpga_data10_node: fpga-data10 { gpios = <&gpioe 0 GPIO_ACTIVE_HIGH>; };
+		fpga_data11_node: fpga-data11 { gpios = <&gpioe 15 GPIO_ACTIVE_HIGH>; };
+		fpga_data12_node: fpga-data12 { gpios = <&gpioe 2 GPIO_ACTIVE_HIGH>; };
+		fpga_data13_node: fpga-data13 { gpios = <&gpioe 12 GPIO_ACTIVE_HIGH>; };
+
+		fpga_ack_node: fpga-ack { gpios = <&gpiob 6 GPIO_ACTIVE_HIGH>; };
+		fpga_irq_node: fpga-irq { gpios = <&gpiob 7 GPIO_ACTIVE_HIGH>; };
 	};
 };
 
@@ -163,7 +230,7 @@
 	pinctrl-0 = <&lpuart1_tx_pb6 &lpuart1_rx_pb7>;
 	pinctrl-names = "default";
 	current-speed = <115200>;
-	status = "okay";
+	status = "disabled"; /* PB6/PB7 used by fpga-ack/fpga-irq */
 };
 
 &usart3 {
@@ -177,7 +244,7 @@
 	pinctrl-0 = <&usart2_tx_pd5 &usart2_rx_pd6>;
 	pinctrl-names = "default";
 	current-speed = <115200>;
-	status = "okay";
+	status = "disabled"; /* PD5/PD6 used by fpga-data7/fpga-data8 */
 };
 
 &rtc {
@@ -266,3 +333,4 @@ zephyr_udc0: &usbotg_hs {
 &rng {
 	status = "okay";
 };
+

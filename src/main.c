@@ -1,5 +1,5 @@
-#include <zephyr/kernel.h>
 #include "app/app.h"
+#include <zephyr/kernel.h>
 
 /* Private Macros */
 
@@ -15,14 +15,14 @@
 
 int main(void)
 {
-    printk("Hello world from oscilocope project!\n");
+    printk("Hello world from oscilloscope project!\n");
 
-    app_init();
+    int ret = app_init();
 
     size_t counter = 0u;
     while (1)
     {
-        printk("Fatal error. Waiting for reboot... %u", counter++);
+        printk("Fatal error %d. Waiting for reboot... %zu\n", ret, counter++);
         k_sleep(K_SECONDS(1));
     }
 
