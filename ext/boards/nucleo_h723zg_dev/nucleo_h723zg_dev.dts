@@ -166,7 +166,7 @@
 		fpga_data6_node:  fpga-data6  { gpios = <&gpiod 4 GPIO_ACTIVE_HIGH>; };
 		fpga_data7_node:  fpga-data7  { gpios = <&gpiod 5 GPIO_ACTIVE_HIGH>; };
 		fpga_data8_node:  fpga-data8  { gpios = <&gpiod 6 GPIO_ACTIVE_HIGH>; };
-		fpga_data9_node:  fpga-data9  { gpios = <&gpiod 7 GPIO_ACTIVE_HIGH>; };
+		fpga_data9_node:  fpga-data9  { gpios = <&gpioe 10 GPIO_ACTIVE_HIGH>; };
 		fpga_data10_node: fpga-data10 { gpios = <&gpioe 0 GPIO_ACTIVE_HIGH>; };
 		fpga_data11_node: fpga-data11 { gpios = <&gpioe 15 GPIO_ACTIVE_HIGH>; };
 		fpga_data12_node: fpga-data12 { gpios = <&gpioe 2 GPIO_ACTIVE_HIGH>; };
