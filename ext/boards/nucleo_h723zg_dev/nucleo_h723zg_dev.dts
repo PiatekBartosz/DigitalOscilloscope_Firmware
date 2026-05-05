@@ -137,6 +137,8 @@
         /* FPGA → MCU: handshake and interrupt */
         fpga-ack    = &fpga_ack_node;
         fpga-irq    = &fpga_irq_node;
+
+		fpga-areset-n = &fpga_areset_n_node;
 	};
 
 	fpga_parallel: fpga_parallel {
@@ -174,6 +176,8 @@
 
 		fpga_ack_node: fpga-ack { gpios = <&gpiob 6 GPIO_ACTIVE_HIGH>; };
 		fpga_irq_node: fpga-irq { gpios = <&gpiob 7 GPIO_ACTIVE_HIGH>; };
+
+		fpga_areset_n_node: fpga-fpga_areset_n { gpios = <&gpiod 11 GPIO_ACTIVE_HIGH>; };
 	};
 };
 

@@ -27,7 +27,10 @@ static const struct gpio_dt_spec s_data[14] = {
 static const struct gpio_dt_spec s_ack = GPIO_FROM_ALIAS(fpga_ack);
 static const struct gpio_dt_spec s_irq = GPIO_FROM_ALIAS(fpga_irq);
 
+static const struct gpio_dt_spec s_areset_n = GPIO_FROM_ALIAS(fpga_areset_n);
+
 #define ACK_TIMEOUT_US 500U
+#define RESET_PULSE_US 10U
 
 static struct k_mutex s_bus_mutex;
 static struct k_sem s_irq_sem;
@@ -126,6 +129,78 @@ static void stream_thread_fn(void *a, void *b, void *c)
     }
 }
 
+#ifdef CONFIG_PLINK_DEBUG
+static void debug_ctrl_loopback(void)
+{
+    uint32_t elapsed;
+    uint8_t echo;
+    bool all_ok = true;
+
+    /* Drive all ctrl HIGH; FPGA echoes ctrl bus → data bus; stuck-low pins read back as 0 */
+    for (int i = 0; i < 8; i++)
+        gpio_pin_set_dt(&s_ctrl[i], 1);
+    gpio_pin_set_dt(&s_rw, 1);
+    gpio_pin_set_dt(&s_req, 1);
+
+    elapsed = 0;
+    while (gpio_pin_get_dt(&s_ack) == 0)
+    {
+        k_busy_wait(1);
+        if (++elapsed >= ACK_TIMEOUT_US)
+        {
+            LOG_ERR("ctrl loopback 0xFF: ACK timeout (req or ack open)");
+            goto cleanup;
+        }
+    }
+    echo = (uint8_t)(read_data() & 0xFFU);
+    gpio_pin_set_dt(&s_req, 0);
+    k_busy_wait(100);
+
+    for (int i = 0; i < 8; i++)
+    {
+        if (!((echo >> i) & 1U))
+        {
+            LOG_ERR("ctrl[%d] stuck LOW: %s pin %u", i, s_ctrl[i].port->name, s_ctrl[i].pin);
+            all_ok = false;
+        }
+    }
+
+    /* Drive all ctrl LOW; stuck-high pins read back as 1 */
+    for (int i = 0; i < 8; i++)
+        gpio_pin_set_dt(&s_ctrl[i], 0);
+    gpio_pin_set_dt(&s_req, 1);
+
+    elapsed = 0;
+    while (gpio_pin_get_dt(&s_ack) == 0)
+    {
+        k_busy_wait(1);
+        if (++elapsed >= ACK_TIMEOUT_US)
+        {
+            LOG_ERR("ctrl loopback 0x00: ACK timeout");
+            goto cleanup;
+        }
+    }
+    echo = (uint8_t)(read_data() & 0xFFU);
+
+    for (int i = 0; i < 8; i++)
+    {
+        if ((echo >> i) & 1U)
+        {
+            LOG_ERR("ctrl[%d] stuck HIGH: %s pin %u", i, s_ctrl[i].port->name, s_ctrl[i].pin);
+            all_ok = false;
+        }
+    }
+
+    if (all_ok)
+        LOG_INF("ctrl loopback: all 8 ctrl pins functional");
+
+cleanup:
+    gpio_pin_set_dt(&s_req, 0);
+    for (int i = 0; i < 8; i++)
+        gpio_pin_set_dt(&s_ctrl[i], 0);
+}
+#endif
+
 int parallel_link_init(plink_irq_cb_t cb)
 {
     int ret;
@@ -133,6 +208,18 @@ int parallel_link_init(plink_irq_cb_t cb)
     k_mutex_init(&s_bus_mutex);
     k_sem_init(&s_irq_sem, 0, K_SEM_MAX_LIMIT);
     s_user_cb = cb;
+
+    if (!gpio_is_ready_dt(&s_areset_n))
+    {
+        LOG_ERR("FPGA ARESET_N not ready");
+        return -ENODEV;
+    }
+
+    ret = gpio_pin_configure_dt(&s_areset_n, GPIO_OUTPUT_ACTIVE);
+    if (ret)
+        return ret;
+
+    gpio_pin_set_dt(&s_areset_n, 1);
 
     for (int i = 0; i < 8; i++)
     {
@@ -258,5 +345,25 @@ int parallel_link_stream_disable(void)
 
 int parallel_link_reset(void)
 {
-    return (transact(0, PLINK_OP_RESET, 0U) == 0xFFFFU) ? -EIO : 0;
+    int ret = 0;
+    ret = gpio_pin_set_dt(&s_areset_n, 0);
+    if (ret)
+    {
+        LOG_ERR("Failed to assert FPGA reset: %d", ret);
+        return ret;
+    }
+
+    k_busy_wait(RESET_PULSE_US);
+
+    ret = gpio_pin_set_dt(&s_areset_n, 1);
+    if (ret)
+    {
+        LOG_ERR("Failed to de-assert FPGA reset: %d", ret);
+        return ret;
+    }
+
+    k_busy_wait(100);
+
+    LOG_INF("FPGA asynchronous reset asserted and de-asserted.");
+    return 0;
 }
