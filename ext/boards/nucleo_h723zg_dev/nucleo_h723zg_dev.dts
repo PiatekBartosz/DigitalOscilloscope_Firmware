@@ -32,7 +32,7 @@
 
 		/* PB0 remapped to fpga-ctrl1; green LED unavailable */
 
-yellow_led: led_1 {
+		yellow_led: led_1 {
 			gpios = <&gpioe 1 GPIO_ACTIVE_HIGH>;
 			label = "User LD2";
 		};
@@ -157,8 +157,8 @@ yellow_led: led_1 {
 		fpga_req_node: fpga-req { gpios = <&gpioe 7 GPIO_ACTIVE_HIGH>; };
 
 		/* DATA bus — inputs */
-		fpga_data0_node:  fpga-data0  { gpios = <&gpiod 1 GPIO_ACTIVE_HIGH>; };
-		fpga_data1_node:  fpga-data1  { gpios = <&gpiod 0 GPIO_ACTIVE_HIGH>; };
+		fpga_data0_node:  fpga-data0  { gpios = <&gpiof 1 GPIO_ACTIVE_HIGH>; };
+		fpga_data1_node:  fpga-data1  { gpios = <&gpiof 0 GPIO_ACTIVE_HIGH>; };
 		fpga_data2_node:  fpga-data2  { gpios = <&gpioe 6 GPIO_ACTIVE_HIGH>; };
 		fpga_data3_node:  fpga-data3  { gpios = <&gpioe 5 GPIO_ACTIVE_HIGH>; };
 		fpga_data4_node:  fpga-data4  { gpios = <&gpioe 4 GPIO_ACTIVE_HIGH>; };
