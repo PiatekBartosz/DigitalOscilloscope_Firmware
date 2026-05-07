@@ -173,7 +173,7 @@ disconnect:
     LOG_INF("Client disconnected");
 }
 
-#define SERVER_THREAD_STACK 2048U
+#define SERVER_THREAD_STACK 4096U
 #define SERVER_THREAD_PRIO  7
 static K_THREAD_STACK_DEFINE(s_server_stack, SERVER_THREAD_STACK);
 static struct k_thread s_server_thread;
