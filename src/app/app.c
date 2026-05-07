@@ -17,10 +17,26 @@ struct adc_sample
 #define SAMPLE_QUEUE_DEPTH 64U
 K_MSGQ_DEFINE(s_sample_queue, sizeof(struct adc_sample), SAMPLE_QUEUE_DEPTH, 2);
 
+/* Shadow of the FPGA CTRL register — mock disabled by default */
+static uint8_t s_fpga_ctrl = PLINK_CTRL_CAPTURE_EN;
+
 static void on_adc_sample(uint16_t ch1, uint16_t ch2)
 {
     struct adc_sample s = {.ch1 = ch1, .ch2 = ch2};
     k_msgq_put(&s_sample_queue, &s, K_NO_WAIT);
+}
+
+int app_set_mock_adc(bool enable)
+{
+    if (enable)
+    {
+        s_fpga_ctrl |= PLINK_CTRL_MOCK_EN;
+    }
+    else
+    {
+        s_fpga_ctrl &= ~(uint8_t)PLINK_CTRL_MOCK_EN;
+    }
+    return parallel_link_write(PLINK_OP_CTRL_REG, s_fpga_ctrl);
 }
 
 int app_init(void)
@@ -47,7 +63,7 @@ int app_init(void)
             LOG_ERR("Error initializing parallel link: %d", errorCode);
         }
 
-        errorCode = parallel_link_write(PLINK_OP_CTRL_REG, PLINK_CTRL_CAPTURE_EN | PLINK_CTRL_MOCK_EN);
+        errorCode = parallel_link_write(PLINK_OP_CTRL_REG, s_fpga_ctrl);
         if (errorCode != 0)
         {
             LOG_ERR("Error configuring FPGA CTRL register: %d", errorCode);

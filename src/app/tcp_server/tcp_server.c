@@ -9,36 +9,88 @@
 #include <zephyr/net/socket.h>
 
 #include "afe_manager/afe_manager.h"
+#include "app.h"
 
 LOG_MODULE_REGISTER(tcp_server);
 
 DNS_SD_REGISTER_TCP_SERVICE(osc_dns_sd, CONFIG_NET_HOSTNAME, "_oscilloscope._tcp", "local", NULL, TCP_SERVER_PORT);
 
-struct adc_frame
+/* -------------------------------------------------------------------------
+ * Waveform frame format (binary, big-endian):
+ *   [0xAD][0xC1]                    2 bytes  sync
+ *   [seq3..seq0]                    4 bytes  uint32 waveform sequence number
+ *   [cnt1][cnt0]                    2 bytes  uint16 sample count (= WAVEFORM_SAMPLES)
+ *   [N × (ch1_hi ch1_lo ch2_hi ch2_lo)]     samples, 4 bytes each
+ * Total: 8 + WAVEFORM_SAMPLES * 4 bytes
+ * ------------------------------------------------------------------------- */
+
+struct waveform_frame
 {
-    uint16_t ch1;
-    uint16_t ch2;
+    uint32_t seq;
+    uint16_t ch1[WAVEFORM_SAMPLES];
+    uint16_t ch2[WAVEFORM_SAMPLES];
 };
 
-#define SAMPLE_QUEUE_DEPTH 128U
-K_MSGQ_DEFINE(s_sample_q, sizeof(struct adc_frame), SAMPLE_QUEUE_DEPTH, 4);
+#define WAVEFORM_QUEUE_DEPTH 2U
+K_MSGQ_DEFINE(s_wf_q, sizeof(struct waveform_frame), WAVEFORM_QUEUE_DEPTH, 4);
+
+static struct waveform_frame s_wf_building;
+static uint16_t              s_wf_fill = 0;
+static uint32_t              s_wf_seq  = 0;
+
+#define FRAME_HDR_LEN   8U
+#define FRAME_SMPL_LEN  (WAVEFORM_SAMPLES * 4U)
+#define FRAME_TOTAL_LEN (FRAME_HDR_LEN + FRAME_SMPL_LEN)
+
+static uint8_t s_tx_buf[FRAME_TOTAL_LEN];
 
 static volatile int s_client_fd = -1;
+
+/* -------------------------------------------------------------------------
+ * Internal helpers
+ * ------------------------------------------------------------------------- */
 
 static void send_reply(int fd, const char *msg)
 {
     zsock_send(fd, msg, strlen(msg), 0);
 }
 
+static bool send_waveform(int fd, const struct waveform_frame *wf)
+{
+    s_tx_buf[0] = 0xADU;
+    s_tx_buf[1] = 0xC1U;
+    s_tx_buf[2] = (uint8_t)(wf->seq >> 24);
+    s_tx_buf[3] = (uint8_t)(wf->seq >> 16);
+    s_tx_buf[4] = (uint8_t)(wf->seq >> 8);
+    s_tx_buf[5] = (uint8_t)(wf->seq);
+    s_tx_buf[6] = (uint8_t)(WAVEFORM_SAMPLES >> 8);
+    s_tx_buf[7] = (uint8_t)(WAVEFORM_SAMPLES);
+
+    for (uint16_t i = 0; i < WAVEFORM_SAMPLES; i++)
+    {
+        uint8_t *p = s_tx_buf + FRAME_HDR_LEN + i * 4U;
+        p[0]       = (uint8_t)(wf->ch1[i] >> 8);
+        p[1]       = (uint8_t)(wf->ch1[i]);
+        p[2]       = (uint8_t)(wf->ch2[i] >> 8);
+        p[3]       = (uint8_t)(wf->ch2[i]);
+    }
+
+    return zsock_send(fd, s_tx_buf, FRAME_TOTAL_LEN, 0) == (ssize_t)FRAME_TOTAL_LEN;
+}
+
+/* -------------------------------------------------------------------------
+ * Command handler
+ * ------------------------------------------------------------------------- */
+
 static void handle_command(int fd, char *line)
 {
     char *tokens[6];
-    int n = 0;
+    int   n   = 0;
     char *tok = strtok(line, " \t\r\n");
     while (tok && n < 6)
     {
         tokens[n++] = tok;
-        tok = strtok(NULL, " \t\r\n");
+        tok         = strtok(NULL, " \t\r\n");
     }
     if (n == 0)
         return;
@@ -50,11 +102,11 @@ static void handle_command(int fd, char *line)
     }
 
     const char *sub = tokens[1];
-    int ret = -EINVAL;
+    int         ret = -EINVAL;
 
     if (strcmp(sub, "gain") == 0 && n == 4)
     {
-        int ch = atoi(tokens[2]);
+        int   ch  = atoi(tokens[2]);
         float pct = strtof(tokens[3], NULL);
         if (ch == 1 || ch == 2)
         {
@@ -63,7 +115,7 @@ static void handle_command(int fd, char *line)
     }
     else if (strcmp(sub, "offset") == 0 && n == 4)
     {
-        int ch = atoi(tokens[2]);
+        int   ch  = atoi(tokens[2]);
         float pct = strtof(tokens[3], NULL);
         if (ch == 1 || ch == 2)
         {
@@ -72,7 +124,7 @@ static void handle_command(int fd, char *line)
     }
     else if (strcmp(sub, "atten") == 0 && n == 4)
     {
-        int ch = atoi(tokens[2]);
+        int ch  = atoi(tokens[2]);
         int val = atoi(tokens[3]);
         if ((ch == 1 || ch == 2) && (val == 1 || val == 100))
         {
@@ -85,34 +137,40 @@ static void handle_command(int fd, char *line)
         int ch = atoi(tokens[2]);
         if (ch == 1 || ch == 2)
         {
-            afe_manager_coupling_t c = strcmp(tokens[3], "dc") == 0 ? AFE_MANAGER_COUPLING_DC : AFE_MANAGER_COUPLING_AC;
+            afe_manager_coupling_t c =
+                strcmp(tokens[3], "dc") == 0 ? AFE_MANAGER_COUPLING_DC : AFE_MANAGER_COUPLING_AC;
             ret = afe_manager_setCoupling((afe_manager_channel_t)ch, c);
         }
     }
     else if (strcmp(sub, "trigger") == 0 && n == 3)
     {
         afe_manager_coupling_t c = strcmp(tokens[2], "dc") == 0 ? AFE_MANAGER_COUPLING_DC : AFE_MANAGER_COUPLING_AC;
-        ret = afe_manager_setTriggerCoupling(c);
+        ret                      = afe_manager_setTriggerCoupling(c);
     }
     else if (strcmp(sub, "interleaved") == 0 && n == 3)
     {
         ret = afe_manager_setInterleaved(atoi(tokens[2]) != 0);
     }
+    else if (strcmp(sub, "mock_adc") == 0 && n == 3)
+    {
+        int val = atoi(tokens[2]);
+        if (val == 0 || val == 1)
+        {
+            ret = app_set_mock_adc(val != 0);
+        }
+    }
 
-    if (ret == 0)
-    {
-        send_reply(fd, "OK\n");
-    }
-    else
-    {
-        send_reply(fd, "ERR: invalid arguments\n");
-    }
+    send_reply(fd, ret == 0 ? "OK\n" : "ERR: invalid arguments\n");
 }
+
+/* -------------------------------------------------------------------------
+ * Client session
+ * ------------------------------------------------------------------------- */
 
 static void serve_client(int client_fd)
 {
     char rx_buf[128];
-    int rx_pos = 0;
+    int  rx_pos = 0;
 
     s_client_fd = client_fd;
 
@@ -146,18 +204,10 @@ static void serve_client(int client_fd)
             break;
         }
 
-        struct adc_frame frame;
-        while (k_msgq_get(&s_sample_q, &frame, K_NO_WAIT) == 0)
+        struct waveform_frame wf;
+        while (k_msgq_get(&s_wf_q, &wf, K_NO_WAIT) == 0)
         {
-            uint8_t pkt[6] = {
-                0xADU,
-                0xC1U,
-                (uint8_t)(frame.ch1 >> 8),
-                (uint8_t)(frame.ch1 & 0xFFU),
-                (uint8_t)(frame.ch2 >> 8),
-                (uint8_t)(frame.ch2 & 0xFFU),
-            };
-            if (zsock_send(client_fd, pkt, sizeof(pkt), 0) < 0)
+            if (!send_waveform(client_fd, &wf))
             {
                 goto disconnect;
             }
@@ -169,9 +219,14 @@ static void serve_client(int client_fd)
 disconnect:
     s_client_fd = -1;
     zsock_close(client_fd);
-    k_msgq_purge(&s_sample_q);
+    k_msgq_purge(&s_wf_q);
+    s_wf_fill = 0;
     LOG_INF("Client disconnected");
 }
+
+/* -------------------------------------------------------------------------
+ * Server thread
+ * ------------------------------------------------------------------------- */
 
 #define SERVER_THREAD_STACK 4096U
 #define SERVER_THREAD_PRIO  7
@@ -188,8 +243,8 @@ static void server_thread_fn(void *a, void *b, void *c)
 
     struct sockaddr_in addr = {
         .sin_family = AF_INET,
-        .sin_port = htons(TCP_SERVER_PORT),
-        .sin_addr = {.s_addr = INADDR_ANY},
+        .sin_port   = htons(TCP_SERVER_PORT),
+        .sin_addr   = {.s_addr = INADDR_ANY},
     };
 
     int server_fd = zsock_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -221,7 +276,7 @@ static void server_thread_fn(void *a, void *b, void *c)
     while (1)
     {
         struct sockaddr_in client_addr;
-        socklen_t client_len = sizeof(client_addr);
+        socklen_t          client_len = sizeof(client_addr);
         int client_fd = zsock_accept(server_fd, (struct sockaddr *)&client_addr, &client_len);
         if (client_fd < 0)
         {
@@ -233,6 +288,10 @@ static void server_thread_fn(void *a, void *b, void *c)
         serve_client(client_fd);
     }
 }
+
+/* -------------------------------------------------------------------------
+ * Public API
+ * ------------------------------------------------------------------------- */
 
 int tcp_server_init(void)
 {
@@ -249,7 +308,14 @@ void tcp_server_push_sample(uint16_t ch1, uint16_t ch2)
     {
         return;
     }
-    struct adc_frame frame = {.ch1 = ch1, .ch2 = ch2};
-    /* K_NO_WAIT: drop sample rather than block if queue is full */
-    k_msgq_put(&s_sample_q, &frame, K_NO_WAIT);
+
+    s_wf_building.ch1[s_wf_fill] = ch1;
+    s_wf_building.ch2[s_wf_fill] = ch2;
+
+    if (++s_wf_fill >= WAVEFORM_SAMPLES)
+    {
+        s_wf_building.seq = s_wf_seq++;
+        k_msgq_put(&s_wf_q, &s_wf_building, K_NO_WAIT);
+        s_wf_fill = 0;
+    }
 }

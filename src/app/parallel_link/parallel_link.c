@@ -81,6 +81,7 @@ static uint16_t transact(uint8_t rw, uint8_t op, uint8_t payload)
 
     write_ctrl(op, rw ? 0U : payload);
     gpio_pin_set_dt(&s_rw, rw);
+    k_busy_wait(1);  /* let ctrl/rw settle at FPGA before req rises */
     gpio_pin_set_dt(&s_req, 1);
 
     uint32_t elapsed = 0;

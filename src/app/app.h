@@ -1,17 +1,9 @@
-#ifndef FILE_NAME_H
-#define FILE_NAME_H
+#ifndef APP_H
+#define APP_H
 
-/* Includes */
 #include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
-
-/* Macros */
-
-/* Type Definitions */
-
-/* Function Prototypes */
 
 int app_init(void);
+int app_set_mock_adc(bool enable);
 
-#endif /* FILE_NAME_H */
+#endif /* APP_H */

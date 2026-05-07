@@ -3,6 +3,7 @@
 #include <zephyr/shell/shell.h>
 
 #include "afe_manager/afe_manager.h"
+#include "app.h"
 
 /* Private helpers */
 
@@ -298,6 +299,28 @@ static int app_shell_cmdAfeInterleaved(const struct shell *shell, size_t argc, c
     return errorCode;
 }
 
+static int app_shell_cmdAfeMockAdc(const struct shell *shell, size_t argc, char **argv)
+{
+    app_shell_debugPrintCmd(shell, argc, argv);
+
+    int value = atoi(argv[1]);
+    if (value != 0 && value != 1)
+    {
+        shell_error(shell, "Value must be 0 or 1");
+        return -EINVAL;
+    }
+
+    int errorCode = app_set_mock_adc(value != 0);
+    if (errorCode != 0)
+    {
+        shell_error(shell, "Failed to set mock ADC (%d)", errorCode);
+        return errorCode;
+    }
+
+    shell_print(shell, "Mock ADC %s", value ? "enabled" : "disabled");
+    return 0;
+}
+
 /* Command tree */
 
 SHELL_STATIC_SUBCMD_SET_CREATE(app_shell_afe_cmds,
@@ -306,8 +329,8 @@ SHELL_STATIC_SUBCMD_SET_CREATE(app_shell_afe_cmds,
                                SHELL_CMD_ARG(atten, NULL, "atten <ch> <1|100>", app_shell_cmdAfeAtten, 3, 0),
                                SHELL_CMD_ARG(coupling, NULL, "coupling <ch> <ac|dc>", app_shell_cmdAfeCoupling, 3, 0),
                                SHELL_CMD_ARG(trigger, NULL, "trigger <ac|dc>", app_shell_cmdAfeTrigger, 2, 0),
-                               SHELL_CMD_ARG(interleaved, NULL, "interleaved <true|false>", app_shell_cmdAfeInterleaved,
-                                             2, 0),
+                               SHELL_CMD_ARG(interleaved, NULL, "interleaved <0|1>", app_shell_cmdAfeInterleaved, 2, 0),
+                               SHELL_CMD_ARG(mock_adc, NULL, "mock_adc <0|1>", app_shell_cmdAfeMockAdc, 2, 0),
                                SHELL_SUBCMD_SET_END);
 
 SHELL_STATIC_SUBCMD_SET_CREATE(app_shell_cmds, SHELL_CMD(afe, &app_shell_afe_cmds, "AFE control", NULL),
