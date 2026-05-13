@@ -31,12 +31,16 @@ struct waveform_frame
     uint16_t ch2[WAVEFORM_SAMPLES];
 };
 
-#define WAVEFORM_QUEUE_DEPTH 2U
-K_MSGQ_DEFINE(s_wf_q, sizeof(struct waveform_frame), WAVEFORM_QUEUE_DEPTH, 4);
+/* Double-buffer: producer fills one buffer while consumer sends the other.
+ * The message queue passes only the ready buffer's index (1 byte), avoiding
+ * any memcpy of the ~32 KB frame. Queue depth 1: if the consumer is busy, the
+ * producer keeps the same fill buffer and overwrites stale data (newest wins). */
+K_MSGQ_DEFINE(s_wf_q, sizeof(uint8_t), 1, 1);
 
-static struct waveform_frame s_wf_building;
-static uint16_t              s_wf_fill = 0;
-static uint32_t              s_wf_seq  = 0;
+static struct waveform_frame s_frame[2];
+static uint8_t               s_fill_idx = 0;
+static uint16_t              s_wf_fill  = 0;
+static uint32_t              s_wf_seq   = 0;
 
 #define FRAME_HDR_LEN   8U
 #define FRAME_SMPL_LEN  (WAVEFORM_SAMPLES * 4U)
@@ -204,10 +208,10 @@ static void serve_client(int client_fd)
             break;
         }
 
-        struct waveform_frame wf;
-        while (k_msgq_get(&s_wf_q, &wf, K_NO_WAIT) == 0)
+        uint8_t idx;
+        while (k_msgq_get(&s_wf_q, &idx, K_NO_WAIT) == 0)
         {
-            if (!send_waveform(client_fd, &wf))
+            if (!send_waveform(client_fd, &s_frame[idx]))
             {
                 goto disconnect;
             }
@@ -220,7 +224,8 @@ disconnect:
     s_client_fd = -1;
     zsock_close(client_fd);
     k_msgq_purge(&s_wf_q);
-    s_wf_fill = 0;
+    s_wf_fill  = 0;
+    s_fill_idx = 0;
     LOG_INF("Client disconnected");
 }
 
@@ -309,13 +314,20 @@ void tcp_server_push_sample(uint16_t ch1, uint16_t ch2)
         return;
     }
 
-    s_wf_building.ch1[s_wf_fill] = ch1;
-    s_wf_building.ch2[s_wf_fill] = ch2;
+    s_frame[s_fill_idx].ch1[s_wf_fill] = ch1;
+    s_frame[s_fill_idx].ch2[s_wf_fill] = ch2;
 
     if (++s_wf_fill >= WAVEFORM_SAMPLES)
     {
-        s_wf_building.seq = s_wf_seq++;
-        k_msgq_put(&s_wf_q, &s_wf_building, K_NO_WAIT);
+        s_frame[s_fill_idx].seq = s_wf_seq++;
+        uint8_t ready = s_fill_idx;
+        /* Only flip the fill buffer when the consumer accepted the frame.
+         * If the queue is full (consumer still sending), keep filling the same
+         * buffer — the stale frame is overwritten and only the latest is sent. */
+        if (k_msgq_put(&s_wf_q, &ready, K_NO_WAIT) == 0)
+        {
+            s_fill_idx ^= 1;
+        }
         s_wf_fill = 0;
     }
 }
