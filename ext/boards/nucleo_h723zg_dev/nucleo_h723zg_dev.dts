@@ -139,6 +139,9 @@
         fpga-irq    = &fpga_irq_node;
 
 		fpga-areset-n = &fpga_areset_n_node;
+
+		fpga-busy = &fpga_ack_node;
+		fpga-inc  = &fpga_ctrl3_node;
 	};
 
 	fpga_parallel: fpga_parallel {
@@ -155,19 +158,19 @@
 		fpga_ctrl6_node: fpga-ctrl6 { gpios = <&gpioe 11 GPIO_ACTIVE_HIGH>; };
 		fpga_ctrl7_node: fpga-ctrl7 { gpios = <&gpioe 13 GPIO_ACTIVE_HIGH>; };
 
-		fpga_rw_node:  fpga-rw  { gpios = <&gpioe 8 GPIO_ACTIVE_HIGH>; };
-		fpga_req_node: fpga-req { gpios = <&gpioe 7 GPIO_ACTIVE_HIGH>; };
+		fpga_rw_node:  fpga-rw  { gpios = <&gpiod 5 GPIO_ACTIVE_HIGH>; };
+		fpga_req_node: fpga-req { gpios = <&gpiod 6 GPIO_ACTIVE_HIGH>; };
 
 		/* DATA bus — inputs */
-		fpga_data0_node:  fpga-data0  { gpios = <&gpiof 1 GPIO_ACTIVE_HIGH>; };
-		fpga_data1_node:  fpga-data1  { gpios = <&gpiof 0 GPIO_ACTIVE_HIGH>; };
+		fpga_data0_node:  fpga-data0  { gpios = <&gpioe 8 GPIO_ACTIVE_HIGH>; };
+		fpga_data1_node:  fpga-data1  { gpios = <&gpioe 7 GPIO_ACTIVE_HIGH>; };
 		fpga_data2_node:  fpga-data2  { gpios = <&gpioe 6 GPIO_ACTIVE_HIGH>; };
 		fpga_data3_node:  fpga-data3  { gpios = <&gpioe 5 GPIO_ACTIVE_HIGH>; };
 		fpga_data4_node:  fpga-data4  { gpios = <&gpioe 4 GPIO_ACTIVE_HIGH>; };
-		fpga_data5_node:  fpga-data5  { gpios = <&gpiod 3 GPIO_ACTIVE_HIGH>; };
-		fpga_data6_node:  fpga-data6  { gpios = <&gpiod 4 GPIO_ACTIVE_HIGH>; };
-		fpga_data7_node:  fpga-data7  { gpios = <&gpiod 5 GPIO_ACTIVE_HIGH>; };
-		fpga_data8_node:  fpga-data8  { gpios = <&gpiod 6 GPIO_ACTIVE_HIGH>; };
+		fpga_data5_node:  fpga-data5  { gpios = <&gpiof 1 GPIO_ACTIVE_HIGH>; };
+		fpga_data6_node:  fpga-data6  { gpios = <&gpiof 0 GPIO_ACTIVE_HIGH>; };
+		fpga_data7_node:  fpga-data7  { gpios = <&gpiod 3 GPIO_ACTIVE_HIGH>; };
+		fpga_data8_node:  fpga-data8  { gpios = <&gpiod 4 GPIO_ACTIVE_HIGH>; };
 		fpga_data9_node:  fpga-data9  { gpios = <&gpioe 10 GPIO_ACTIVE_HIGH>; };
 		fpga_data10_node: fpga-data10 { gpios = <&gpioe 0 GPIO_ACTIVE_HIGH>; };
 		fpga_data11_node: fpga-data11 { gpios = <&gpioe 15 GPIO_ACTIVE_HIGH>; };

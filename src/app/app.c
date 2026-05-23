@@ -45,19 +45,18 @@ int app_set_mock_adc(bool enable)
     {
         s_fpga_ctrl &= ~(uint8_t)PLINK_CTRL_MOCK_EN;
     }
-    return parallel_link_write(PLINK_OP_CTRL_REG, s_fpga_ctrl);
+    return parallel_link_write(PLINK_ADDR_CTRL, s_fpga_ctrl);
 }
 
 int app_reset_fpga_buffer(void)
 {
-    int ret = parallel_link_write(PLINK_OP_CTRL_REG,
-                                  s_fpga_ctrl | PLINK_CTRL_RESET_FIFO);
+    int ret = parallel_link_write(PLINK_ADDR_CTRL, s_fpga_ctrl | PLINK_CTRL_RESET_FIFO);
     if (ret != 0)
     {
         LOG_ERR("Failed to assert RESET_FIFO: %d", ret);
         return ret;
     }
-    ret = parallel_link_write(PLINK_OP_CTRL_REG, s_fpga_ctrl);
+    ret = parallel_link_write(PLINK_ADDR_CTRL, s_fpga_ctrl);
     if (ret != 0)
     {
         LOG_ERR("Failed to de-assert RESET_FIFO: %d", ret);
@@ -108,7 +107,7 @@ int app_init(void)
         return ret;
     }
 
-    ret = parallel_link_write(PLINK_OP_CTRL_REG, s_fpga_ctrl);
+    ret = parallel_link_write(PLINK_ADDR_CTRL, s_fpga_ctrl);
     if (ret != 0)
     {
         LOG_ERR("Failed to write FPGA CTRL register: %d", ret);

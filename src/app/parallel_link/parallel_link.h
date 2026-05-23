@@ -3,37 +3,76 @@
 
 #include <stdint.h>
 
-#define PLINK_OP_CH1          0x0U
-#define PLINK_OP_CH2          0x1U
-#define PLINK_OP_STATUS       0x2U
-#define PLINK_OP_CTRL_REG     0x3U
-#define PLINK_OP_SAMPLE_SIZE  0x4U  /* log2(count) in ctrl[6:3]; read returns actual count */
-#define PLINK_OP_RESET        0x7U
+/*
+ * Register addresses (CFG_ADDR[2:0]).
+ * Reads and writes share the same address space; rw pin selects direction.
+ */
+#define PLINK_ADDR_BUILD        0x0U  /* read: build number (0x89)          */
+#define PLINK_ADDR_VERSION      0x1U  /* read: version      (0x07)          */
+#define PLINK_ADDR_CH1          0x2U  /* read: CH1 sample [13:0]            */
+#define PLINK_ADDR_CH2          0x3U  /* read: CH2 sample [13:0]            */
+#define PLINK_ADDR_STATUS       0x4U  /* read: status flags                 */
+#define PLINK_ADDR_CTRL         0x5U  /* write: capture_en/mock_en/rst_fifo */
+#define PLINK_ADDR_SAMPLE_SIZE  0x6U  /* write: log2(sample count), 0..13   */
+#define PLINK_ADDR_RESET        0x7U  /* write: restore all defaults        */
 
-#define PLINK_CTRL_CAPTURE_EN (1U << 0)
-#define PLINK_CTRL_MOCK_EN    (1U << 1)
-#define PLINK_CTRL_RESET_FIFO (1U << 2)
+#define PLINK_CTRL_CAPTURE_EN   (1U << 0)
+#define PLINK_CTRL_MOCK_EN      (1U << 1)
+#define PLINK_CTRL_RESET_FIFO   (1U << 2)
 
-#define PLINK_STATUS_FIFO_OVF (1U << 0)
-#define PLINK_STATUS_BATCH_RDY (1U << 1)
-#define PLINK_STATUS_SDRAM_BSY (1U << 2)
+#define PLINK_STATUS_FIFO_OVF   (1U << 0)
+#define PLINK_STATUS_BATCH_RDY  (1U << 1)
+#define PLINK_STATUS_SDRAM_BSY  (1U << 2)
 
-#define PLINK_ADC_MASK           0x3FFFU
-#define PLINK_DEVICE_ID_EXPECTED 0x0ADCu
+#define PLINK_ADC_MASK           0x3FFFU   /* 14-bit mask                   */
+#define PLINK_BUILD_EXPECTED     0x89U
+#define PLINK_VERSION_EXPECTED   0x07U
 
-int      parallel_link_init(void);
-int      parallel_link_write(uint8_t op, uint8_t value);
-uint16_t parallel_link_read(uint8_t op);
-uint16_t parallel_link_read_status(void);
-int      parallel_link_reset(void);
+/*
+ * Initialise GPIOs and verify FPGA identity.
+ * Returns 0 on success, negative errno on failure.
+ */
+int parallel_link_init(void);
 
-/* Write OP_SAMPLE_SIZE.  count must be a power of two in [1, 8192].
- * Returns 0 on success, -EINVAL if count is out of range or not a power of 2,
- * -EIO on bus timeout. */
+/*
+ * Write an 8-bit value to a register (MCU drives 14-bit bus, upper bits = 0).
+ * Returns 0 on success, -EIO on BUSY timeout.
+ */
+int parallel_link_write(uint8_t addr, uint8_t value);
+
+/*
+ * Read an 8-bit register (lower 8 bits of the 14-bit bus).
+ */
+uint8_t parallel_link_read_byte(uint8_t addr);
+
+/*
+ * Read a 14-bit ADC sample register in one transaction.
+ * Returns value masked to PLINK_ADC_MASK.
+ */
+uint16_t parallel_link_read_sample(uint8_t addr);
+
+/*
+ * Read the status register.
+ */
+uint8_t parallel_link_read_status(void);
+
+/*
+ * Pulse the FPGA asynchronous reset line.
+ */
+int parallel_link_reset(void);
+
+/*
+ * Configure the capture depth.  count must be a power of two in [1, 8192].
+ */
 int parallel_link_set_sample_size(uint16_t count);
 
-/* Poll FPGA until batch_ready, then bulk-read count CH1/CH2 pairs.
- * Returns 0 on success, -ETIMEDOUT if the buffer doesn't fill within timeout_ms. */
+/*
+ * Poll until batch_ready, then bulk-read count CH1/CH2 sample pairs using
+ * the increment pin for streaming.  Each increment pulse advances the
+ * sample-buffer pointer; CH1 and CH2 are read combinationally after each step.
+ *
+ * Returns 0 on success, -ETIMEDOUT if batch_ready never fires within timeout_ms.
+ */
 int parallel_link_acquire(uint16_t *ch1, uint16_t *ch2, uint16_t count,
                           uint32_t timeout_ms);
 
