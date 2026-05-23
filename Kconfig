@@ -8,4 +8,27 @@ config PLINK_DEBUG
 	  the expected value (0x0ADC). Logs an error and returns -EIO if the
 	  handshake fails.
 
+config TCP_SERVER_LOG_LEVEL
+	int "TCP server log level (0=off 1=err 2=wrn 3=inf 4=dbg)"
+	default 3
+	range 0 4
+	help
+	  Compile-time log level for the tcp_server module.
+	  Set to 4 to see every command received over TCP.
+
+config PARALLEL_LINK_LOG_LEVEL
+	int "Parallel link log level (0=off 1=err 2=wrn 3=inf 4=dbg)"
+	default 3
+	range 0 4
+	help
+	  Compile-time log level for the parallel_link module.
+	  Set to 4 to see STATUS polling and CTRL writes during acquisition.
+
+config APP_LOG_LEVEL
+	int "Application log level (0=off 1=err 2=wrn 3=inf 4=dbg)"
+	default 3
+	range 0 4
+	help
+	  Compile-time log level for the app module.
+
 source "Kconfig.zephyr"

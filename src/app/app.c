@@ -6,26 +6,35 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-LOG_MODULE_REGISTER(app);
-
-struct adc_sample
-{
-    uint16_t ch1;
-    uint16_t ch2;
-};
-
-#define SAMPLE_QUEUE_DEPTH 64U
-K_MSGQ_DEFINE(s_sample_queue, sizeof(struct adc_sample), SAMPLE_QUEUE_DEPTH, 2);
+LOG_MODULE_REGISTER(app, CONFIG_APP_LOG_LEVEL);
 
 /* Shadow of the FPGA CTRL register — mock disabled by default */
 static uint8_t s_fpga_ctrl = PLINK_CTRL_CAPTURE_EN;
 
-static void on_adc_sample(uint16_t ch1, uint16_t ch2)
+/* Current capture depth, mirroring the FPGA OP_SAMPLE_SIZE register. */
+static uint16_t s_sample_size = 8192U;
+
+/* Timeout for waiting on the FPGA sample buffer to fill.
+ * At 1 kHz mock rate with 8192 samples this is ~8.2 s; allow generous margin. */
+#define ACQUIRE_TIMEOUT_MS 30000U
+
+int app_set_sample_size(uint16_t count)
 {
-    struct adc_sample s = {.ch1 = ch1, .ch2 = ch2};
-    k_msgq_put(&s_sample_queue, &s, K_NO_WAIT);
+    int ret = parallel_link_set_sample_size(count);
+    if (ret == 0)
+    {
+        s_sample_size = count;
+        LOG_INF("Sample size set to %u", count);
+    }
+    return ret;
 }
 
+uint16_t app_get_sample_size(void)
+{
+    return s_sample_size;
+}
+
+//TODO: remove that and normaly read this
 int app_set_mock_adc(bool enable)
 {
     if (enable)
@@ -39,54 +48,80 @@ int app_set_mock_adc(bool enable)
     return parallel_link_write(PLINK_OP_CTRL_REG, s_fpga_ctrl);
 }
 
+int app_reset_fpga_buffer(void)
+{
+    int ret = parallel_link_write(PLINK_OP_CTRL_REG,
+                                  s_fpga_ctrl | PLINK_CTRL_RESET_FIFO);
+    if (ret != 0)
+    {
+        LOG_ERR("Failed to assert RESET_FIFO: %d", ret);
+        return ret;
+    }
+    ret = parallel_link_write(PLINK_OP_CTRL_REG, s_fpga_ctrl);
+    if (ret != 0)
+    {
+        LOG_ERR("Failed to de-assert RESET_FIFO: %d", ret);
+    }
+    return ret;
+}
+
+int app_acquire(uint16_t *ch1, uint16_t *ch2)
+{
+    LOG_DBG("app_acquire: ctrl_shadow=0x%02x (cap=%d mock=%d) count=%u",
+            s_fpga_ctrl,
+            (s_fpga_ctrl & PLINK_CTRL_CAPTURE_EN) ? 1 : 0,
+            (s_fpga_ctrl & PLINK_CTRL_MOCK_EN)    ? 1 : 0,
+            s_sample_size);
+
+    int ret = app_reset_fpga_buffer();
+    if (ret != 0)
+    {
+        return ret;
+    }
+
+    LOG_DBG("app_acquire: FPGA reset done, waiting for samples");
+    return parallel_link_acquire(ch1, ch2, s_sample_size, ACQUIRE_TIMEOUT_MS);
+}
+
 int app_init(void)
 {
-    int errorCode = 0;
+    int ret;
 
-    do
+    ret = afe_manager_init();
+    if (ret != 0)
     {
-        errorCode = afe_manager_init();
-        if (errorCode != 0)
-        {
-            LOG_ERR("Error initializing afe manager: %d", errorCode);
-        }
+        LOG_ERR("afe_manager_init failed: %d", ret);
+        return ret;
+    }
 
-        errorCode = tcp_server_init();
-        if (errorCode != 0)
-        {
-            LOG_ERR("Error initializing TCP server: %d", errorCode);
-        }
+    ret = tcp_server_init();
+    if (ret != 0)
+    {
+        LOG_ERR("tcp_server_init failed: %d", ret);
+        return ret;
+    }
 
-        errorCode = parallel_link_init(on_adc_sample);
-        if (errorCode != 0)
-        {
-            LOG_ERR("Error initializing parallel link: %d", errorCode);
-        }
+    ret = parallel_link_init();
+    if (ret != 0)
+    {
+        LOG_ERR("parallel_link_init failed: %d", ret);
+        return ret;
+    }
 
-        errorCode = parallel_link_write(PLINK_OP_CTRL_REG, s_fpga_ctrl);
-        if (errorCode != 0)
-        {
-            LOG_ERR("Error configuring FPGA CTRL register: %d", errorCode);
-        }
+    ret = parallel_link_write(PLINK_OP_CTRL_REG, s_fpga_ctrl);
+    if (ret != 0)
+    {
+        LOG_ERR("Failed to write FPGA CTRL register: %d", ret);
+        return ret;
+    }
 
-        errorCode = parallel_link_stream_enable();
-        if (errorCode != 0)
-        {
-            LOG_ERR("Error enabling parallel link streaming: %d", errorCode);
-        }
+    LOG_INF("App initialized — waiting for acquire commands from TCP client");
 
-        LOG_INF("App initialized — forwarding ADC samples to TCP");
+    /* TCP server runs in its own thread; main thread has nothing to do. */
+    while (true)
+    {
+        k_sleep(K_SECONDS(1));
+    }
 
-        struct adc_sample s;
-        while (true)
-        {
-            if (k_msgq_get(&s_sample_queue, &s, K_MSEC(100)) == 0)
-            {
-                tcp_server_push_sample(s.ch1, s.ch2);
-            }
-        }
-
-    } while (0);
-
-    return errorCode;
+    return 0;
 }

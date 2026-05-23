@@ -26,7 +26,7 @@ build:
 
 # Clean the build directory
 clean:
-	rm -rf $(BUILD_DIR)
+	rm -rf $(BUILD_DIR) $(DEPLOY_DIR)
 	echo "Clean done!"
 
 # Run the compiled executable
