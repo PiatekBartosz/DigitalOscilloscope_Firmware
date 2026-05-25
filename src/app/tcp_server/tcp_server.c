@@ -278,6 +278,14 @@ static void handle_command(int fd, char *line)
             ret = app_set_sample_size((uint16_t)val);
         }
     }
+    else if (strcmp(sub, "decim") == 0 && n == 3)
+    {
+        int val = atoi(tokens[2]);
+        if (val >= 1 && val <= 2047)
+        {
+            ret = app_set_decim_factor((uint16_t)val);
+        }
+    }
 
     send_reply(fd, ret == 0 ? "OK\n" : "ERR: invalid arguments\n");
 }

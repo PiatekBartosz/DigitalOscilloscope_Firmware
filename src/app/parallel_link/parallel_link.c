@@ -202,10 +202,10 @@ static uint16_t read_sample(uint8_t addr)
     return result;
 }
 
-static int write_reg(uint8_t addr, uint8_t value)
+static int write_reg(uint8_t addr, uint16_t value)
 {
     k_mutex_lock(&s_bus_mutex, K_FOREVER);
-    int ret = write_nolock(addr, (uint16_t)value);
+    int ret = write_nolock(addr, value);
     k_mutex_unlock(&s_bus_mutex);
     return ret;
 }
@@ -265,9 +265,9 @@ int parallel_link_init(void)
     return 0;
 }
 
-int parallel_link_write(uint8_t addr, uint8_t value)
+int parallel_link_write(uint8_t addr, uint16_t value)
 {
-    LOG_DBG("WRITE addr=0x%X val=0x%02X", addr, value);
+    LOG_DBG("WRITE addr=0x%X val=0x%04X", addr, value);
     return write_reg(addr, value);
 }
 

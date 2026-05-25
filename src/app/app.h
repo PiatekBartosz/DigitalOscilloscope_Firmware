@@ -17,6 +17,10 @@ int app_reset_fpga_buffer(void);
 int      app_set_sample_size(uint16_t count);
 uint16_t app_get_sample_size(void);
 
+/* Set the FPGA decimation factor (1..2047).  1 = no decimation.
+ * Takes effect immediately; the FPGA applies it to subsequent ADC samples. */
+int app_set_decim_factor(uint16_t factor);
+
 /* Flush any stale buffer, wait for FPGA to fill sample pairs, then read them
  * into ch1[]/ch2[] (caller must provide buffers of at least app_get_sample_size()
  * entries).  Returns 0 on success, negative errno on failure. */

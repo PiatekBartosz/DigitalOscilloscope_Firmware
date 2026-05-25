@@ -322,6 +322,28 @@ static int app_shell_cmdAfeMockAdc(const struct shell *shell, size_t argc, char 
     return 0;
 }
 
+static int app_shell_cmdAfeDecim(const struct shell *shell, size_t argc, char **argv)
+{
+    app_shell_debugPrintCmd(shell, argc, argv);
+
+    int value = atoi(argv[1]);
+    if (value < 1 || value > 2047)
+    {
+        shell_error(shell, "Decimation factor must be in [1, 2047]");
+        return -EINVAL;
+    }
+
+    int errorCode = app_set_decim_factor((uint16_t)value);
+    if (errorCode != 0)
+    {
+        shell_error(shell, "Failed to set decimation factor (%d)", errorCode);
+        return errorCode;
+    }
+
+    shell_print(shell, "Decimation factor set to %d", value);
+    return 0;
+}
+
 static int app_shell_cmdAfeSampleSize(const struct shell *shell, size_t argc, char **argv)
 {
     app_shell_debugPrintCmd(shell, argc, argv);
@@ -356,6 +378,8 @@ SHELL_STATIC_SUBCMD_SET_CREATE(app_shell_afe_cmds,
                                SHELL_CMD_ARG(mock_adc, NULL, "mock_adc <0|1>", app_shell_cmdAfeMockAdc, 2, 0),
                                SHELL_CMD_ARG(sample_size, NULL, "sample_size <count> (power of 2, 1..8192)",
                                              app_shell_cmdAfeSampleSize, 2, 0),
+                               SHELL_CMD_ARG(decim, NULL, "decim <factor> (1..2047; 1=no decimation)",
+                                             app_shell_cmdAfeDecim, 2, 0),
                                SHELL_SUBCMD_SET_END);
 
 SHELL_STATIC_SUBCMD_SET_CREATE(app_shell_cmds, SHELL_CMD(afe, &app_shell_afe_cmds, "AFE control", NULL),

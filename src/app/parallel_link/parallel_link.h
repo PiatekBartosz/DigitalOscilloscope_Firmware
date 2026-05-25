@@ -20,6 +20,12 @@
 #define PLINK_CTRL_MOCK_EN      (1U << 1)
 #define PLINK_CTRL_RESET_FIFO   (1U << 2)
 
+/* Decimation factor packed in CTRL bits [13:3].  0 and 1 both mean no decimation. */
+#define PLINK_CTRL_DECIM_SHIFT  3U
+#define PLINK_CTRL_DECIM_MAX    2047U
+#define PLINK_CTRL_DECIM(f)     ((uint16_t)((uint16_t)(f) & (uint16_t)PLINK_CTRL_DECIM_MAX) \
+                                 << PLINK_CTRL_DECIM_SHIFT)
+
 #define PLINK_STATUS_FIFO_OVF   (1U << 0)
 #define PLINK_STATUS_BATCH_RDY  (1U << 1)
 #define PLINK_STATUS_SDRAM_BSY  (1U << 2)
@@ -35,10 +41,10 @@
 int parallel_link_init(void);
 
 /*
- * Write an 8-bit value to a register (MCU drives 14-bit bus, upper bits = 0).
+ * Write a 14-bit value to a register.
  * Returns 0 on success, -EIO on BUSY timeout.
  */
-int parallel_link_write(uint8_t addr, uint8_t value);
+int parallel_link_write(uint8_t addr, uint16_t value);
 
 /*
  * Read an 8-bit register (lower 8 bits of the 14-bit bus).

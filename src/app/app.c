@@ -8,8 +8,8 @@
 
 LOG_MODULE_REGISTER(app, CONFIG_APP_LOG_LEVEL);
 
-/* Shadow of the FPGA CTRL register — mock disabled by default */
-static uint8_t s_fpga_ctrl = PLINK_CTRL_CAPTURE_EN;
+/* Shadow of the full 14-bit FPGA CTRL register — capture enabled, decim=1 by default */
+static uint16_t s_fpga_ctrl = PLINK_CTRL_CAPTURE_EN;
 
 /* Current capture depth, mirroring the FPGA OP_SAMPLE_SIZE register. */
 static uint16_t s_sample_size = 8192U;
@@ -43,14 +43,26 @@ int app_set_mock_adc(bool enable)
     }
     else
     {
-        s_fpga_ctrl &= ~(uint8_t)PLINK_CTRL_MOCK_EN;
+        s_fpga_ctrl &= ~(uint16_t)PLINK_CTRL_MOCK_EN;
     }
+    return parallel_link_write(PLINK_ADDR_CTRL, s_fpga_ctrl);
+}
+
+int app_set_decim_factor(uint16_t factor)
+{
+    if (factor < 1U || factor > PLINK_CTRL_DECIM_MAX)
+    {
+        LOG_ERR("decim_factor %u out of range [1, %u]", factor, PLINK_CTRL_DECIM_MAX);
+        return -EINVAL;
+    }
+    s_fpga_ctrl = (s_fpga_ctrl & 0x0007U) | PLINK_CTRL_DECIM(factor);
+    LOG_INF("Decimation factor set to %u (ctrl=0x%04X)", factor, s_fpga_ctrl);
     return parallel_link_write(PLINK_ADDR_CTRL, s_fpga_ctrl);
 }
 
 int app_reset_fpga_buffer(void)
 {
-    int ret = parallel_link_write(PLINK_ADDR_CTRL, s_fpga_ctrl | PLINK_CTRL_RESET_FIFO);
+    int ret = parallel_link_write(PLINK_ADDR_CTRL, s_fpga_ctrl | (uint16_t)PLINK_CTRL_RESET_FIFO);
     if (ret != 0)
     {
         LOG_ERR("Failed to assert RESET_FIFO: %d", ret);
