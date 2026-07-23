@@ -1,5 +1,6 @@
 #include "tcp_server.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <zephyr/kernel.h>
@@ -10,11 +11,11 @@
 
 #include "afe_manager/afe_manager.h"
 #include "app.h"
+#include "parallel_link/parallel_link.h"
 
 LOG_MODULE_REGISTER(tcp_server, CONFIG_TCP_SERVER_LOG_LEVEL);
 
-DNS_SD_REGISTER_TCP_SERVICE(osc_dns_sd, CONFIG_NET_HOSTNAME,
-                            "_oscilloscope._tcp", "local", NULL, TCP_SERVER_PORT);
+DNS_SD_REGISTER_TCP_SERVICE(osc_dns_sd, CONFIG_NET_HOSTNAME, "_oscilloscope._tcp", "local", NULL, TCP_SERVER_PORT);
 
 /* -------------------------------------------------------------------------
  * Waveform frame format (binary, big-endian):
@@ -32,17 +33,13 @@ DNS_SD_REGISTER_TCP_SERVICE(osc_dns_sd, CONFIG_NET_HOSTNAME,
 /* Static buffers — too large for the stack. */
 static uint16_t s_ch1[WAVEFORM_SAMPLES];
 static uint16_t s_ch2[WAVEFORM_SAMPLES];
-static uint8_t  s_tx_buf[FRAME_TOTAL_LEN];
+static uint8_t s_tx_buf[FRAME_TOTAL_LEN];
 static uint32_t s_wf_seq = 0;
 
 /* Count of samples stored by the last raw_write command.
  * raw_read uses this so it sends exactly as many samples as were captured,
  * even if sample_size has been changed since. */
 static uint16_t s_raw_count = 0;
-
-/* -------------------------------------------------------------------------
- * Helpers
- * ------------------------------------------------------------------------- */
 
 static void send_reply(int fd, const char *msg)
 {
@@ -65,10 +62,10 @@ static bool send_waveform(int fd, uint16_t count)
     for (uint16_t i = 0; i < count; i++)
     {
         uint8_t *p = s_tx_buf + FRAME_HDR_LEN + i * 4U;
-        p[0]       = (uint8_t)(s_ch1[i] >> 8);
-        p[1]       = (uint8_t)(s_ch1[i]);
-        p[2]       = (uint8_t)(s_ch2[i] >> 8);
-        p[3]       = (uint8_t)(s_ch2[i]);
+        p[0] = (uint8_t)(s_ch1[i] >> 8);
+        p[1] = (uint8_t)(s_ch1[i]);
+        p[2] = (uint8_t)(s_ch2[i] >> 8);
+        p[3] = (uint8_t)(s_ch2[i]);
     }
 
     s_wf_seq++;
@@ -80,8 +77,7 @@ static bool send_waveform(int fd, uint16_t count)
         ssize_t n = zsock_send(fd, s_tx_buf + sent, frame_len - sent, 0);
         if (n <= 0)
         {
-            LOG_ERR("send_waveform: send error at offset %zu (ret=%d errno=%d)",
-                    sent, (int)n, errno);
+            LOG_ERR("send_waveform: send error at offset %zu (ret=%d errno=%d)", sent, (int)n, errno);
             return false;
         }
         sent += (size_t)n;
@@ -90,27 +86,72 @@ static bool send_waveform(int fd, uint16_t count)
     return true;
 }
 
-/* -------------------------------------------------------------------------
- * Command handler
- * ------------------------------------------------------------------------- */
-
 static void handle_command(int fd, char *line)
 {
     LOG_DBG("CMD: %s", line);
 
     char *tokens[6];
-    int   n   = 0;
+    int n = 0;
     char *tok = strtok(line, " \t\r\n");
     while (tok && n < 6)
     {
         tokens[n++] = tok;
-        tok         = strtok(NULL, " \t\r\n");
+        tok = strtok(NULL, " \t\r\n");
     }
     if (n == 0)
         return;
 
+    /* Status combines the firmware's applied configuration with the FPGA's
+     * live state.  It is deliberately plain text so it can be used from the
+     * desktop UI, a TCP terminal, and a bring-up log without another parser. */
+    if (strcmp(tokens[0], "status") == 0 && n == 1)
+    {
+        char reply[512];
+        afe_manager_state_t afe = afe_manager_getState();
+        uint8_t fpga_status = app_get_fpga_status();
+        uint8_t build = parallel_link_read_byte(PLINK_ADDR_BUILD);
+        uint8_t version = parallel_link_read_byte(PLINK_ADDR_VERSION);
+        uint16_t ctrl_readback = parallel_link_read_sample(PLINK_ADDR_CTRL);
+        uint16_t sample_cfg_readback = parallel_link_read_sample(PLINK_ADDR_SAMPLE_SIZE);
+
+        /* Avoid depending on floating-point printf support in the target C
+         * library.  The AFE values are reported as percentages with two
+         * decimal places, so the desktop can present the configuration the
+         * firmware actually applied. */
+        uint32_t ch1_gain_centi = (uint32_t)(afe.ch[0].gain_percent * 100.0f + 0.5f);
+        uint32_t ch1_offset_centi = (uint32_t)(afe.ch[0].offset_percent * 100.0f + 0.5f);
+        uint32_t ch2_gain_centi = (uint32_t)(afe.ch[1].gain_percent * 100.0f + 0.5f);
+        uint32_t ch2_offset_centi = (uint32_t)(afe.ch[1].offset_percent * 100.0f + 0.5f);
+        uint32_t trigger_mv = (uint32_t)(afe_manager_getTriggerLevelVoltage() * 1000.0f + 0.5f);
+
+        snprintf(reply, sizeof(reply),
+                 "STATUS build=0x%02X version=0x%02X depth=%u pretrigger=%u "
+                 "decim=%u trigger=%s mock=%u fpga_status=0x%02X ready=%u overflow=%u "
+                 "prehistory=%u armed=%u ctrl=0x%04X sample_cfg=0x%04X "
+                 "afe_ch1_gain_pct=%u.%02u afe_ch1_offset_pct=%u.%02u "
+                 "afe_ch1_atten=1:%u afe_ch1_coupling=%s afe_ch1_range_vpp=%u "
+                 "afe_ch2_gain_pct=%u.%02u afe_ch2_offset_pct=%u.%02u "
+                 "afe_ch2_atten=1:%u afe_ch2_coupling=%s afe_ch2_range_vpp=%u "
+                 "afe_trigger_source=%u afe_trigger_level_pct=%u.%02u "
+                 "afe_trigger_level_mv=%u interleaved=%u\n",
+                 build, version, app_get_sample_size(), app_get_pretrigger(), app_get_decim_factor(),
+                 app_get_trigger_mode() ? "normal" : "off", app_get_mock_adc() ? 1U : 0U, fpga_status,
+                 (fpga_status & PLINK_STATUS_BATCH_RDY) ? 1U : 0U, (fpga_status & PLINK_STATUS_FIFO_OVF) ? 1U : 0U,
+                 (fpga_status & PLINK_STATUS_PRETRIG_RDY) ? 1U : 0U,
+                 (fpga_status & PLINK_STATUS_TRIGGER_ARMED) ? 1U : 0U, ctrl_readback, sample_cfg_readback,
+                 ch1_gain_centi / 100U, ch1_gain_centi % 100U, ch1_offset_centi / 100U, ch1_offset_centi % 100U,
+                 afe.ch[0].attenuation == AFE_MANAGER_ATTEN_1_TO_100 ? 100U : 1U,
+                 afe.ch[0].coupling == AFE_MANAGER_COUPLING_DC ? "dc" : "ac", (uint32_t)afe.ch[0].adc_range_vpp,
+                 ch2_gain_centi / 100U, ch2_gain_centi % 100U, ch2_offset_centi / 100U, ch2_offset_centi % 100U,
+                 afe.ch[1].attenuation == AFE_MANAGER_ATTEN_1_TO_100 ? 100U : 1U,
+                 afe.ch[1].coupling == AFE_MANAGER_COUPLING_DC ? "dc" : "ac", (uint32_t)afe.ch[1].adc_range_vpp,
+                 afe.trigger_source, (uint32_t)(afe.trigger_level_percent * 100.0f + 0.5f) / 100U,
+                 (uint32_t)(afe.trigger_level_percent * 100.0f + 0.5f) % 100U, trigger_mv, afe.interleaved ? 1U : 0U);
+        send_reply(fd, reply);
+        return;
+    }
+
     /* "acquire" — capture one batch and send it as a binary frame */
-    //TODO: change for strcmpn
     if (strcmp(tokens[0], "acquire") == 0)
     {
         uint16_t count = app_get_sample_size();
@@ -209,11 +250,11 @@ static void handle_command(int fd, char *line)
     }
 
     const char *sub = tokens[1];
-    int         ret = -EINVAL;
+    int ret = -EINVAL;
 
     if (strcmp(sub, "gain") == 0 && n == 4)
     {
-        int   ch  = atoi(tokens[2]);
+        int ch = atoi(tokens[2]);
         float pct = strtof(tokens[3], NULL);
         if (ch == 1 || ch == 2)
         {
@@ -222,7 +263,7 @@ static void handle_command(int fd, char *line)
     }
     else if (strcmp(sub, "offset") == 0 && n == 4)
     {
-        int   ch  = atoi(tokens[2]);
+        int ch = atoi(tokens[2]);
         float pct = strtof(tokens[3], NULL);
         if (ch == 1 || ch == 2)
         {
@@ -231,36 +272,52 @@ static void handle_command(int fd, char *line)
     }
     else if (strcmp(sub, "atten") == 0 && n == 4)
     {
-        int ch  = atoi(tokens[2]);
+        int ch = atoi(tokens[2]);
         int val = atoi(tokens[3]);
         if ((ch == 1 || ch == 2) && (val == 1 || val == 100))
         {
-            ret = afe_manager_setAttenuation(
-                (afe_manager_channel_t)ch,
-                val == 100 ? AFE_MANAGER_ATTEN_1_TO_100 : AFE_MANAGER_ATTEN_1_TO_1);
+            ret = afe_manager_setAttenuation((afe_manager_channel_t)ch,
+                                             val == 100 ? AFE_MANAGER_ATTEN_1_TO_100 : AFE_MANAGER_ATTEN_1_TO_1);
         }
     }
     else if (strcmp(sub, "coupling") == 0 && n == 4)
     {
         int ch = atoi(tokens[2]);
-        if (ch == 1 || ch == 2)
+        if ((ch == 1 || ch == 2) && (strcmp(tokens[3], "dc") == 0 || strcmp(tokens[3], "ac") == 0))
         {
-            afe_manager_coupling_t c =
-                strcmp(tokens[3], "dc") == 0 ? AFE_MANAGER_COUPLING_DC
-                                              : AFE_MANAGER_COUPLING_AC;
+            afe_manager_coupling_t c = strcmp(tokens[3], "dc") == 0 ? AFE_MANAGER_COUPLING_DC : AFE_MANAGER_COUPLING_AC;
             ret = afe_manager_setCoupling((afe_manager_channel_t)ch, c);
         }
     }
-    else if (strcmp(sub, "trigger") == 0 && n == 3)
+    else if (strcmp(sub, "range") == 0 && n == 4)
     {
-        afe_manager_coupling_t c =
-            strcmp(tokens[2], "dc") == 0 ? AFE_MANAGER_COUPLING_DC
-                                         : AFE_MANAGER_COUPLING_AC;
-        ret = afe_manager_setTriggerCoupling(c);
+        int ch = atoi(tokens[2]);
+        int vpp = atoi(tokens[3]);
+        if ((ch == 1 || ch == 2) && (vpp == 1 || vpp == 2))
+        {
+            ret = afe_manager_setAdcRange((afe_manager_channel_t)ch, (afe_manager_adc_range_t)vpp);
+        }
+    }
+    else if (strcmp(sub, "trigger_ch") == 0 && n == 3)
+    {
+        int ch = atoi(tokens[2]);
+        if (ch == 1 || ch == 2)
+        {
+            ret = afe_manager_setTriggerSource((afe_manager_channel_t)ch);
+        }
+    }
+    else if (strcmp(sub, "trigger_level") == 0 && n == 3)
+    {
+        float pct = strtof(tokens[2], NULL);
+        ret = afe_manager_setTriggerLevel(pct);
     }
     else if (strcmp(sub, "interleaved") == 0 && n == 3)
     {
-        ret = afe_manager_setInterleaved(atoi(tokens[2]) != 0);
+        int val = atoi(tokens[2]);
+        if (val == 0 || val == 1)
+        {
+            ret = afe_manager_setInterleaved(val != 0);
+        }
     }
     else if (strcmp(sub, "mock_adc") == 0 && n == 3)
     {
@@ -278,31 +335,45 @@ static void handle_command(int fd, char *line)
             ret = app_set_sample_size((uint16_t)val);
         }
     }
+    else if (strcmp(sub, "pretrigger") == 0 && n == 3)
+    {
+        int val = atoi(tokens[2]);
+        if (val >= 0 && val <= PLINK_PRETRIGGER_MAX && (val == 0 || (val & (val - 1)) == 0))
+        {
+            ret = app_set_pretrigger((uint16_t)val);
+        }
+    }
     else if (strcmp(sub, "decim") == 0 && n == 3)
     {
         int val = atoi(tokens[2]);
-        if (val >= 1 && val <= 2047)
+        if (val >= 1 && val <= 1023)
         {
             ret = app_set_decim_factor((uint16_t)val);
+        }
+    }
+    else if (strcmp(sub, "trigger_mode") == 0 && n == 3)
+    {
+        if (strcmp(tokens[2], "normal") == 0)
+        {
+            ret = app_set_trigger_mode(true);
+        }
+        else if (strcmp(tokens[2], "off") == 0)
+        {
+            ret = app_set_trigger_mode(false);
         }
     }
 
     send_reply(fd, ret == 0 ? "OK\n" : "ERR: invalid arguments\n");
 }
 
-/* -------------------------------------------------------------------------
- * Client session
- * ------------------------------------------------------------------------- */
-
 static void serve_client(int client_fd)
 {
     char rx_buf[128];
-    int  rx_pos = 0;
+    int rx_pos = 0;
 
     while (1)
     {
-        ssize_t n = zsock_recv(client_fd, rx_buf + rx_pos,
-                               sizeof(rx_buf) - rx_pos - 1U, ZSOCK_MSG_DONTWAIT);
+        ssize_t n = zsock_recv(client_fd, rx_buf + rx_pos, sizeof(rx_buf) - rx_pos - 1U, ZSOCK_MSG_DONTWAIT);
         if (n > 0)
         {
             rx_pos += (int)n;
@@ -322,6 +393,7 @@ static void serve_client(int client_fd)
             }
             if (rx_pos >= (int)(sizeof(rx_buf) - 1))
             {
+                LOG_WRN("serve_client: rx_buf full with no newline (%d bytes) — discarding", rx_pos);
                 rx_pos = 0;
             }
         }
@@ -336,10 +408,6 @@ static void serve_client(int client_fd)
     zsock_close(client_fd);
     LOG_INF("Client disconnected");
 }
-
-/* -------------------------------------------------------------------------
- * Server thread
- * ------------------------------------------------------------------------- */
 
 #define SERVER_THREAD_STACK 4096U
 #define SERVER_THREAD_PRIO  7
@@ -356,8 +424,8 @@ static void server_thread_fn(void *a, void *b, void *c)
 
     struct sockaddr_in addr = {
         .sin_family = AF_INET,
-        .sin_port   = htons(TCP_SERVER_PORT),
-        .sin_addr   = {.s_addr = INADDR_ANY},
+        .sin_port = htons(TCP_SERVER_PORT),
+        .sin_addr = {.s_addr = INADDR_ANY},
     };
 
     int server_fd = zsock_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -389,9 +457,8 @@ static void server_thread_fn(void *a, void *b, void *c)
     while (1)
     {
         struct sockaddr_in client_addr;
-        socklen_t          client_len = sizeof(client_addr);
-        int client_fd = zsock_accept(server_fd, (struct sockaddr *)&client_addr,
-                                     &client_len);
+        socklen_t client_len = sizeof(client_addr);
+        int client_fd = zsock_accept(server_fd, (struct sockaddr *)&client_addr, &client_len);
         if (client_fd < 0)
         {
             LOG_ERR("accept() failed: %d", errno);
@@ -405,10 +472,8 @@ static void server_thread_fn(void *a, void *b, void *c)
 
 int tcp_server_init(void)
 {
-    k_thread_create(&s_server_thread, s_server_stack,
-                    K_THREAD_STACK_SIZEOF(s_server_stack),
-                    server_thread_fn, NULL, NULL, NULL,
-                    SERVER_THREAD_PRIO, 0, K_NO_WAIT);
+    k_thread_create(&s_server_thread, s_server_stack, K_THREAD_STACK_SIZEOF(s_server_stack), server_thread_fn, NULL,
+                    NULL, NULL, SERVER_THREAD_PRIO, 0, K_NO_WAIT);
     k_thread_name_set(&s_server_thread, "tcp_server");
     LOG_INF("TCP server thread started");
     return 0;

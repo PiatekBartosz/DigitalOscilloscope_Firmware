@@ -7,32 +7,42 @@
  * Register addresses (CFG_ADDR[2:0]).
  * Reads and writes share the same address space; rw pin selects direction.
  */
-#define PLINK_ADDR_BUILD        0x0U  /* read: build number (0x89)          */
-#define PLINK_ADDR_VERSION      0x1U  /* read: version      (0x07)          */
-#define PLINK_ADDR_CH1          0x2U  /* read: CH1 sample [13:0]            */
-#define PLINK_ADDR_CH2          0x3U  /* read: CH2 sample [13:0]            */
-#define PLINK_ADDR_STATUS       0x4U  /* read: status flags                 */
-#define PLINK_ADDR_CTRL         0x5U  /* write: capture_en/mock_en/rst_fifo */
-#define PLINK_ADDR_SAMPLE_SIZE  0x6U  /* write: log2(sample count), 0..13   */
-#define PLINK_ADDR_RESET        0x7U  /* write: restore all defaults        */
+#define PLINK_ADDR_BUILD       0x0U /* read: build number (0x89)          */
+#define PLINK_ADDR_VERSION     0x1U /* read: version      (0x07)          */
+#define PLINK_ADDR_CH1         0x2U /* read: CH1 sample [13:0]            */
+#define PLINK_ADDR_CH2         0x3U /* read: CH2 sample [13:0]            */
+#define PLINK_ADDR_STATUS      0x4U /* read: status flags                 */
+#define PLINK_ADDR_CTRL        0x5U /* write: capture_en/mock_en/rst_fifo */
+#define PLINK_ADDR_SAMPLE_SIZE 0x6U /* write: log2(sample count), 0..13   */
+#define PLINK_ADDR_RESET       0x7U /* write: restore all defaults        */
 
-#define PLINK_CTRL_CAPTURE_EN   (1U << 0)
-#define PLINK_CTRL_MOCK_EN      (1U << 1)
-#define PLINK_CTRL_RESET_FIFO   (1U << 2)
+#define PLINK_CTRL_CAPTURE_EN  (1U << 0)
+#define PLINK_CTRL_MOCK_EN     (1U << 1)
+#define PLINK_CTRL_RESET_FIFO  (1U << 2)
+#define PLINK_CTRL_TRIGGER_EN  (1U << 3)
 
-/* Decimation factor packed in CTRL bits [13:3].  0 and 1 both mean no decimation. */
-#define PLINK_CTRL_DECIM_SHIFT  3U
-#define PLINK_CTRL_DECIM_MAX    2047U
-#define PLINK_CTRL_DECIM(f)     ((uint16_t)((uint16_t)(f) & (uint16_t)PLINK_CTRL_DECIM_MAX) \
-                                 << PLINK_CTRL_DECIM_SHIFT)
+/* Decimation factor packed in CTRL bits [13:4].  0 and 1 both mean no decimation. */
+#define PLINK_CTRL_DECIM_SHIFT     4U
+#define PLINK_CTRL_DECIM_MAX       1023U
+#define PLINK_CTRL_DECIM(f)        ((uint16_t)((uint16_t)(f) & (uint16_t)PLINK_CTRL_DECIM_MAX) << PLINK_CTRL_DECIM_SHIFT)
 
-#define PLINK_STATUS_FIFO_OVF   (1U << 0)
-#define PLINK_STATUS_BATCH_RDY  (1U << 1)
-#define PLINK_STATUS_SDRAM_BSY  (1U << 2)
+#define PLINK_STATUS_FIFO_OVF      (1U << 0)
+#define PLINK_STATUS_BATCH_RDY     (1U << 1)
+#define PLINK_STATUS_SDRAM_BSY     (1U << 2)
+#define PLINK_STATUS_PRETRIG_RDY   (1U << 3)
+#define PLINK_STATUS_TRIGGER_ARMED (1U << 4)
 
-#define PLINK_ADC_MASK           0x3FFFU   /* 14-bit mask                   */
-#define PLINK_BUILD_EXPECTED     0x89U
-#define PLINK_VERSION_EXPECTED   0x07U
+/* Pretrigger field packed into SAMPLE_SIZE bits [7:4]: 0=disabled,
+ * else log2(pretrigger count)+1. Shares the register with sample_size_exp
+ * in bits [3:0] — parallel_link_set_sample_size()/set_pretrigger() shadow
+ * both fields internally so neither write clobbers the other. */
+#define PLINK_SAMPLE_SIZE_PRETRIG_SHIFT 4U
+#define PLINK_SAMPLE_SIZE_PRETRIG_MASK  0xFU
+#define PLINK_PRETRIGGER_MAX            4096U
+
+#define PLINK_ADC_MASK                  0x3FFFU /* 14-bit mask                   */
+#define PLINK_BUILD_EXPECTED            0x89U
+#define PLINK_VERSION_EXPECTED          0x07U
 
 /*
  * Initialise GPIOs and verify FPGA identity.
@@ -73,13 +83,20 @@ int parallel_link_reset(void);
 int parallel_link_set_sample_size(uint16_t count);
 
 /*
+ * Configure the pretrigger depth. count must be 0 (disabled) or a power of
+ * two; the FPGA clamps it to at most (sample_size - 1) so the trigger sample
+ * itself is always kept. Shares a register with sample size (see above) —
+ * safe to call independently of parallel_link_set_sample_size().
+ */
+int parallel_link_set_pretrigger(uint16_t count);
+
+/*
  * Poll until batch_ready, then bulk-read count CH1/CH2 sample pairs using
  * the increment pin for streaming.  Each increment pulse advances the
  * sample-buffer pointer; CH1 and CH2 are read combinationally after each step.
  *
  * Returns 0 on success, -ETIMEDOUT if batch_ready never fires within timeout_ms.
  */
-int parallel_link_acquire(uint16_t *ch1, uint16_t *ch2, uint16_t count,
-                          uint32_t timeout_ms);
+int parallel_link_acquire(uint16_t *ch1, uint16_t *ch2, uint16_t count, uint32_t timeout_ms);
 
 #endif /* PARALLEL_LINK_H */

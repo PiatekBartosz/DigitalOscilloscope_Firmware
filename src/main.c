@@ -1,18 +1,6 @@
 #include "app/app.h"
 #include <zephyr/kernel.h>
 
-/* Private Macros */
-
-/* Private Types */
-
-/* Private Variables */
-
-/* Private Function Prototypes */
-
-/* Private Functions */
-
-/* Public Functions */
-
 int main(void)
 {
     printk("Hello world from oscilloscope project!\n");

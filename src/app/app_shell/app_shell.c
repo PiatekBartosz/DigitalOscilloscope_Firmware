@@ -6,8 +6,6 @@
 #include "app.h"
 #include "parallel_link/parallel_link.h"
 
-/* Private helpers */
-
 static void app_shell_debugPrintCmd(const struct shell *shell, size_t argc, char **argv)
 {
     shell_fprintf(shell, SHELL_NORMAL, "CMD:");
@@ -98,8 +96,6 @@ static int app_shell_parseAttenuation(const char *arg, afe_manager_attenuation_t
 
     return errorCode;
 }
-
-/* Shell commands */
 
 static int app_shell_cmdAfeGain(const struct shell *shell, size_t argc, char **argv)
 {
@@ -239,29 +235,69 @@ static int app_shell_cmdAfeCoupling(const struct shell *shell, size_t argc, char
     return errorCode;
 }
 
-static int app_shell_cmdAfeTrigger(const struct shell *shell, size_t argc, char **argv)
+static int app_shell_cmdAfeTriggerLevel(const struct shell *shell, size_t argc, char **argv)
+{
+    app_shell_debugPrintCmd(shell, argc, argv);
+
+    float percent = strtof(argv[1], NULL);
+
+    int errorCode = afe_manager_setTriggerLevel(percent);
+    if (errorCode != 0)
+    {
+        shell_error(shell, "Failed to set trigger level (%d)", errorCode);
+        return errorCode;
+    }
+
+    shell_print(shell, "Trigger level set to %.2f%%", (double)percent);
+    return 0;
+}
+
+static int app_shell_cmdAfeRange(const struct shell *shell, size_t argc, char **argv)
+{
+    app_shell_debugPrintCmd(shell, argc, argv);
+    afe_manager_channel_t channel;
+    int errorCode = app_shell_parseChannel(argv[1], &channel);
+    int range = atoi(argv[2]);
+    if (errorCode != 0 || (range != 1 && range != 2))
+    {
+        shell_error(shell, "Usage: range <1|2> <1|2> (differential Vpp)");
+        return -EINVAL;
+    }
+
+    errorCode = afe_manager_setAdcRange(channel, (afe_manager_adc_range_t)range);
+    if (errorCode != 0)
+    {
+        shell_error(shell, "Failed to set ADC range (%d)", errorCode);
+        return errorCode;
+    }
+
+    shell_print(shell, "CH%d ADC range set to %d Vpp differential", (int)channel, range);
+    return 0;
+}
+
+static int app_shell_cmdAfeTriggerCh(const struct shell *shell, size_t argc, char **argv)
 {
     app_shell_debugPrintCmd(shell, argc, argv);
     int errorCode = 0;
-    afe_manager_coupling_t coupling = AFE_MANAGER_COUPLING_AC;
+    afe_manager_channel_t channel = AFE_MANAGER_CH1;
 
     do
     {
-        errorCode = app_shell_parseCoupling(argv[1], &coupling);
+        errorCode = app_shell_parseChannel(argv[1], &channel);
         if (errorCode != 0)
         {
-            shell_error(shell, "Coupling must be ac or dc");
+            shell_error(shell, "Channel must be 1 or 2");
             break;
         }
 
-        errorCode = afe_manager_setTriggerCoupling(coupling);
+        errorCode = afe_manager_setTriggerSource(channel);
         if (errorCode != 0)
         {
-            shell_error(shell, "Failed to set trigger coupling (%d)", errorCode);
+            shell_error(shell, "Failed to set trigger source (%d)", errorCode);
             break;
         }
 
-        shell_print(shell, "Trigger coupling updated");
+        shell_print(shell, "Trigger source set to CH%d", (int)channel);
 
     } while (0);
 
@@ -322,14 +358,44 @@ static int app_shell_cmdAfeMockAdc(const struct shell *shell, size_t argc, char 
     return 0;
 }
 
+static int app_shell_cmdAfeTriggerMode(const struct shell *shell, size_t argc, char **argv)
+{
+    app_shell_debugPrintCmd(shell, argc, argv);
+
+    bool enable;
+    if (strcmp(argv[1], "normal") == 0)
+    {
+        enable = true;
+    }
+    else if (strcmp(argv[1], "off") == 0)
+    {
+        enable = false;
+    }
+    else
+    {
+        shell_error(shell, "Mode must be 'off' or 'normal'");
+        return -EINVAL;
+    }
+
+    int errorCode = app_set_trigger_mode(enable);
+    if (errorCode != 0)
+    {
+        shell_error(shell, "Failed to set trigger mode (%d)", errorCode);
+        return errorCode;
+    }
+
+    shell_print(shell, "Trigger mode set to %s", argv[1]);
+    return 0;
+}
+
 static int app_shell_cmdAfeDecim(const struct shell *shell, size_t argc, char **argv)
 {
     app_shell_debugPrintCmd(shell, argc, argv);
 
     int value = atoi(argv[1]);
-    if (value < 1 || value > 2047)
+    if (value < 1 || value > 1023)
     {
-        shell_error(shell, "Decimation factor must be in [1, 2047]");
+        shell_error(shell, "Decimation factor must be in [1, 1023]");
         return -EINVAL;
     }
 
@@ -366,21 +432,44 @@ static int app_shell_cmdAfeSampleSize(const struct shell *shell, size_t argc, ch
     return 0;
 }
 
-/* Command tree */
+static int app_shell_cmdAfePretrigger(const struct shell *shell, size_t argc, char **argv)
+{
+    app_shell_debugPrintCmd(shell, argc, argv);
 
-SHELL_STATIC_SUBCMD_SET_CREATE(app_shell_afe_cmds,
-                               SHELL_CMD_ARG(gain, NULL, "gain <ch> <percent>", app_shell_cmdAfeGain, 3, 0),
-                               SHELL_CMD_ARG(offset, NULL, "offset <ch> <percent>", app_shell_cmdAfeOffset, 3, 0),
-                               SHELL_CMD_ARG(atten, NULL, "atten <ch> <1|100>", app_shell_cmdAfeAtten, 3, 0),
-                               SHELL_CMD_ARG(coupling, NULL, "coupling <ch> <ac|dc>", app_shell_cmdAfeCoupling, 3, 0),
-                               SHELL_CMD_ARG(trigger, NULL, "trigger <ac|dc>", app_shell_cmdAfeTrigger, 2, 0),
-                               SHELL_CMD_ARG(interleaved, NULL, "interleaved <0|1>", app_shell_cmdAfeInterleaved, 2, 0),
-                               SHELL_CMD_ARG(mock_adc, NULL, "mock_adc <0|1>", app_shell_cmdAfeMockAdc, 2, 0),
-                               SHELL_CMD_ARG(sample_size, NULL, "sample_size <count> (power of 2, 1..8192)",
-                                             app_shell_cmdAfeSampleSize, 2, 0),
-                               SHELL_CMD_ARG(decim, NULL, "decim <factor> (1..2047; 1=no decimation)",
-                                             app_shell_cmdAfeDecim, 2, 0),
-                               SHELL_SUBCMD_SET_END);
+    int value = atoi(argv[1]);
+    if (value < 0 || value > PLINK_PRETRIGGER_MAX || (value != 0 && (value & (value - 1)) != 0))
+    {
+        shell_error(shell, "Count must be 0 (disabled) or a power of two in [1, %u]", PLINK_PRETRIGGER_MAX);
+        return -EINVAL;
+    }
+
+    int errorCode = app_set_pretrigger((uint16_t)value);
+    if (errorCode != 0)
+    {
+        shell_error(shell, "Failed to set pretrigger (%d)", errorCode);
+        return errorCode;
+    }
+
+    shell_print(shell, "Pretrigger set to %d samples", value);
+    return 0;
+}
+
+SHELL_STATIC_SUBCMD_SET_CREATE(
+    app_shell_afe_cmds, SHELL_CMD_ARG(gain, NULL, "gain <ch> <percent>", app_shell_cmdAfeGain, 3, 0),
+    SHELL_CMD_ARG(offset, NULL, "offset <ch> <percent>", app_shell_cmdAfeOffset, 3, 0),
+    SHELL_CMD_ARG(atten, NULL, "atten <ch> <1|100>", app_shell_cmdAfeAtten, 3, 0),
+    SHELL_CMD_ARG(coupling, NULL, "coupling <ch> <ac|dc>", app_shell_cmdAfeCoupling, 3, 0),
+    SHELL_CMD_ARG(range, NULL, "range <ch> <1|2> (differential Vpp)", app_shell_cmdAfeRange, 3, 0),
+    SHELL_CMD_ARG(trigger_ch, NULL, "trigger_ch <1|2>", app_shell_cmdAfeTriggerCh, 2, 0),
+    SHELL_CMD_ARG(trigger_level, NULL, "trigger_level <percent 0..100>", app_shell_cmdAfeTriggerLevel, 2, 0),
+    SHELL_CMD_ARG(trigger_mode, NULL, "trigger_mode <off|normal>", app_shell_cmdAfeTriggerMode, 2, 0),
+    SHELL_CMD_ARG(interleaved, NULL, "interleaved <0|1>", app_shell_cmdAfeInterleaved, 2, 0),
+    SHELL_CMD_ARG(mock_adc, NULL, "mock_adc <0|1>", app_shell_cmdAfeMockAdc, 2, 0),
+    SHELL_CMD_ARG(sample_size, NULL, "sample_size <count> (power of 2, 1..8192)", app_shell_cmdAfeSampleSize, 2, 0),
+    SHELL_CMD_ARG(pretrigger, NULL, "pretrigger <count> (0=disabled, power of 2, <=4096)", app_shell_cmdAfePretrigger,
+                  2, 0),
+    SHELL_CMD_ARG(decim, NULL, "decim <factor> (1..1023; 1=no decimation)", app_shell_cmdAfeDecim, 2, 0),
+    SHELL_SUBCMD_SET_END);
 
 SHELL_STATIC_SUBCMD_SET_CREATE(app_shell_cmds, SHELL_CMD(afe, &app_shell_afe_cmds, "AFE control", NULL),
                                SHELL_SUBCMD_SET_END);

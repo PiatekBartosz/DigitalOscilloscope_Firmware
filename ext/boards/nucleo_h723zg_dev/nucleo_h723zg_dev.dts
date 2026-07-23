@@ -67,13 +67,13 @@
 			label = "AFE_COUPLING_CH2";
 		};
 
-		coupling_trigger: coupling_trigger {
-			gpios = <&gpioa 0 GPIO_ACTIVE_HIGH>;
-			label = "AFE_COUPLING_TRIGGER";
+		trigger_source: trigger_source {
+			gpios = <&gpiog 0 GPIO_ACTIVE_HIGH>;
+			label = "AFE_TRIGGER_SOURCE";
 		};
 
 		interleaved: interleaved {
-			gpios = <&gpiog 0 GPIO_ACTIVE_HIGH>;
+			gpios = <&gpioa 0 GPIO_ACTIVE_HIGH>;
 			label = "AFE_INTERLEAVED";
 		};
 	};
@@ -134,9 +134,8 @@
         fpga-data12 = &fpga_data12_node;
         fpga-data13 = &fpga_data13_node;
 
-        /* FPGA → MCU: handshake and interrupt */
+        /* FPGA → MCU: handshake */
         fpga-ack    = &fpga_ack_node;
-        fpga-irq    = &fpga_irq_node;
 
 		fpga-areset-n = &fpga_areset_n_node;
 
@@ -178,7 +177,6 @@
 		fpga_data13_node: fpga-data13 { gpios = <&gpioe 12 GPIO_ACTIVE_HIGH>; };
 
 		fpga_ack_node: fpga-ack { gpios = <&gpiob 6 GPIO_ACTIVE_HIGH>; };
-		fpga_irq_node: fpga-irq { gpios = <&gpiob 7 GPIO_ACTIVE_HIGH>; };
 
 		fpga_areset_n_node: fpga-fpga_areset_n { gpios = <&gpiod 11 GPIO_ACTIVE_HIGH>; };
 	};
@@ -237,7 +235,7 @@
 	pinctrl-0 = <&lpuart1_tx_pb6 &lpuart1_rx_pb7>;
 	pinctrl-names = "default";
 	current-speed = <115200>;
-	status = "disabled"; /* PB6/PB7 used by fpga-ack/fpga-irq */
+	status = "disabled"; /* PB6 used by fpga-ack */
 };
 
 &usart3 {

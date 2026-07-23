@@ -7,23 +7,23 @@
 int app_init(void);
 int app_set_mock_adc(bool enable);
 
-/* Pulse RESET_FIFO on the FPGA: forces sample_buffer back to ST_FILLING at
- * address 0 without reading any samples.  Use before raw_write to guarantee
- * a clean capture start.  Returns 0 or negative errno. */
 int app_reset_fpga_buffer(void);
 
-/* Change the FPGA capture depth.  count must be a power of two in [1, 8192].
- * Takes effect on the next acquire.  Returns 0 or negative errno. */
-int      app_set_sample_size(uint16_t count);
+int app_set_sample_size(uint16_t count);
 uint16_t app_get_sample_size(void);
 
-/* Set the FPGA decimation factor (1..2047).  1 = no decimation.
- * Takes effect immediately; the FPGA applies it to subsequent ADC samples. */
-int app_set_decim_factor(uint16_t factor);
+int app_set_pretrigger(uint16_t count);
+uint16_t app_get_pretrigger(void);
 
-/* Flush any stale buffer, wait for FPGA to fill sample pairs, then read them
- * into ch1[]/ch2[] (caller must provide buffers of at least app_get_sample_size()
- * entries).  Returns 0 on success, negative errno on failure. */
+int app_set_decim_factor(uint16_t factor);
+uint16_t app_get_decim_factor(void);
+
+int app_set_trigger_mode(bool enable);
+bool app_get_trigger_mode(void);
+bool app_get_mock_adc(void);
+
+uint8_t app_get_fpga_status(void);
+
 int app_acquire(uint16_t *ch1, uint16_t *ch2);
 
 #endif /* APP_H */

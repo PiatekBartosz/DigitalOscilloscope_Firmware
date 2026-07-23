@@ -21,10 +21,10 @@ static const struct gpio_dt_spec s_ctrl[3] = {
     GPIO_FROM_ALIAS(fpga_ctrl2),
 };
 
-static const struct gpio_dt_spec s_rw       = GPIO_FROM_ALIAS(fpga_rw);       /* C7_Write_To_FPGA → PE8 */
-static const struct gpio_dt_spec s_req      = GPIO_FROM_ALIAS(fpga_req);      /* C3_Trigger_Clock_INP   */
-static const struct gpio_dt_spec s_inc      = GPIO_FROM_ALIAS(fpga_inc);      /* Increment pin          */
-static const struct gpio_dt_spec s_busy     = GPIO_FROM_ALIAS(fpga_busy);     /* Status_FPGA_Busy       */
+static const struct gpio_dt_spec s_rw = GPIO_FROM_ALIAS(fpga_rw);     /* C7_Write_To_FPGA → PE8 */
+static const struct gpio_dt_spec s_req = GPIO_FROM_ALIAS(fpga_req);   /* C3_Trigger_Clock_INP   */
+static const struct gpio_dt_spec s_inc = GPIO_FROM_ALIAS(fpga_inc);   /* Increment pin          */
+static const struct gpio_dt_spec s_busy = GPIO_FROM_ALIAS(fpga_busy); /* Status_FPGA_Busy       */
 static const struct gpio_dt_spec s_areset_n = GPIO_FROM_ALIAS(fpga_areset_n);
 
 /*
@@ -38,35 +38,59 @@ static const struct gpio_dt_spec s_areset_n = GPIO_FROM_ALIAS(fpga_areset_n);
  *   GPIOD: rw=PD5(b5),     req=PD6(b6)   [control, same GPIOD port]
  */
 static const struct gpio_dt_spec s_data[14] = {
-    GPIO_FROM_ALIAS(fpga_data0),  GPIO_FROM_ALIAS(fpga_data1),
-    GPIO_FROM_ALIAS(fpga_data2),  GPIO_FROM_ALIAS(fpga_data3),
-    GPIO_FROM_ALIAS(fpga_data4),  GPIO_FROM_ALIAS(fpga_data5),
-    GPIO_FROM_ALIAS(fpga_data6),  GPIO_FROM_ALIAS(fpga_data7),
-    GPIO_FROM_ALIAS(fpga_data8),  GPIO_FROM_ALIAS(fpga_data9),
-    GPIO_FROM_ALIAS(fpga_data10), GPIO_FROM_ALIAS(fpga_data11),
+    GPIO_FROM_ALIAS(fpga_data0),  GPIO_FROM_ALIAS(fpga_data1),  GPIO_FROM_ALIAS(fpga_data2),
+    GPIO_FROM_ALIAS(fpga_data3),  GPIO_FROM_ALIAS(fpga_data4),  GPIO_FROM_ALIAS(fpga_data5),
+    GPIO_FROM_ALIAS(fpga_data6),  GPIO_FROM_ALIAS(fpga_data7),  GPIO_FROM_ALIAS(fpga_data8),
+    GPIO_FROM_ALIAS(fpga_data9),  GPIO_FROM_ALIAS(fpga_data10), GPIO_FROM_ALIAS(fpga_data11),
     GPIO_FROM_ALIAS(fpga_data12), GPIO_FROM_ALIAS(fpga_data13),
 };
 
-#define BUSY_TIMEOUT_US  500U
-#define RESET_PULSE_US   10U
+#define BUSY_TIMEOUT_US 500U
+#define RESET_PULSE_US  10U
+/*
+ * The FPGA receives REQ through a two-flop synchronizer.  A register write
+ * must therefore keep address, direction and data stable long enough for the
+ * synchronized edge to be decoded, and the line must remain low long enough
+ * for a subsequent write to create a distinct edge.  This is particularly
+ * important for app_reset_fpga_buffer(), which writes RESET_FIFO=1 followed
+ * immediately by RESET_FIFO=0.
+ */
+#define REQ_PULSE_US 1U
+#define REQ_GUARD_US 1U
 
 /* CFG_ADDR scatter masks — rw/req use gpio_pin_set_dt */
-#define MASK_CTRL_GPIOB  ((1U << 11) | (1U << 0))  /* addr0=PB11, addr1=PB0  */
-#define MASK_CTRL_GPIOE   (1U << 14)                /* addr2=PE14             */
+#define MASK_CTRL_GPIOB ((1U << 11) | (1U << 0)) /* addr0=PB11, addr1=PB0  */
+#define MASK_CTRL_GPIOE (1U << 14)               /* addr2=PE14             */
 
 /* Data bus scatter masks */
-#define MASK_DATA_GPIOE  ((1U << 8) | (1U << 7) | (1U << 6) | (1U << 5) | (1U << 4) | \
-                          (1U << 10) | (1U << 0) | (1U << 15) | (1U << 2) | (1U << 12))
-#define MASK_DATA_GPIOF  ((1U << 1) | (1U << 0))
-#define MASK_DATA_GPIOD  ((1U << 3) | (1U << 4))
+#define MASK_DATA_GPIOE                                                                                            \
+    ((1U << 8) | (1U << 7) | (1U << 6) | (1U << 5) | (1U << 4) | (1U << 10) | (1U << 0) | (1U << 15) | (1U << 2) | \
+     (1U << 12))
+#define MASK_DATA_GPIOF ((1U << 1) | (1U << 0))
+#define MASK_DATA_GPIOD ((1U << 3) | (1U << 4))
 
 static struct k_mutex s_bus_mutex;
+
+/* Shadow of the SAMPLE_SIZE register's two packed fields, so a write to
+ * either one never clobbers the other (see PLINK_ADDR_SAMPLE_SIZE). Defaults
+ * match the FPGA's own reset defaults (r_sample_size_exp=13, no pretrigger). */
+static uint8_t s_sample_size_exp = 13U;
+static uint8_t s_pretrigger_field = 0U;
+
+static uint16_t configured_sample_size(void)
+{
+    return (uint16_t)(1U << s_sample_size_exp);
+}
+
+static uint16_t configured_pretrigger_count(void)
+{
+    return s_pretrigger_field == 0U ? 0U : (uint16_t)(1U << (s_pretrigger_field - 1U));
+}
 
 /* Set CFG_ADDR[2:0] and rw. */
 static void write_addr_rw(uint8_t addr, int rw)
 {
-    uint32_t pb = (((addr >> 0) & 1U) << 11) |
-                  (((addr >> 1) & 1U) << 0);
+    uint32_t pb = (((addr >> 0) & 1U) << 11) | (((addr >> 1) & 1U) << 0);
     gpio_port_set_masked_raw(s_ctrl[0].port, MASK_CTRL_GPIOB, pb);
 
     uint32_t pe = (((addr >> 2) & 1U) << 14);
@@ -81,24 +105,16 @@ static void write_addr_rw(uint8_t addr, int rw)
  */
 static void write_data_bus(uint16_t value)
 {
-    uint32_t pe = (((value >>  0) & 1U) << 8)  |
-                  (((value >>  1) & 1U) << 7)  |
-                  (((value >>  2) & 1U) << 6)  |
-                  (((value >>  3) & 1U) << 5)  |
-                  (((value >>  4) & 1U) << 4)  |
-                  (((value >>  9) & 1U) << 10) |
-                  (((value >> 10) & 1U) << 0)  |
-                  (((value >> 11) & 1U) << 15) |
-                  (((value >> 12) & 1U) << 2)  |
+    uint32_t pe = (((value >> 0) & 1U) << 8) | (((value >> 1) & 1U) << 7) | (((value >> 2) & 1U) << 6) |
+                  (((value >> 3) & 1U) << 5) | (((value >> 4) & 1U) << 4) | (((value >> 9) & 1U) << 10) |
+                  (((value >> 10) & 1U) << 0) | (((value >> 11) & 1U) << 15) | (((value >> 12) & 1U) << 2) |
                   (((value >> 13) & 1U) << 12);
     gpio_port_set_masked_raw(s_data[0].port, MASK_DATA_GPIOE, pe);
 
-    uint32_t pf = (((value >> 5) & 1U) << 1) |
-                  (((value >> 6) & 1U) << 0);
+    uint32_t pf = (((value >> 5) & 1U) << 1) | (((value >> 6) & 1U) << 0);
     gpio_port_set_masked_raw(s_data[5].port, MASK_DATA_GPIOF, pf);
 
-    uint32_t pd = (((value >> 7) & 1U) << 3) |
-                  (((value >> 8) & 1U) << 4);
+    uint32_t pd = (((value >> 7) & 1U) << 3) | (((value >> 8) & 1U) << 4);
     gpio_port_set_masked_raw(s_data[7].port, MASK_DATA_GPIOD, pd);
 }
 
@@ -112,22 +128,22 @@ static uint16_t read_data_bus(void)
     gpio_port_get_raw(s_data[5].port, &pf);
     gpio_port_get_raw(s_data[7].port, &pd);
 
-    return (uint16_t)(
-        (((pe >>  8) & 1U) <<  0) |   /* data0  = PE8  */
-        (((pe >>  7) & 1U) <<  1) |   /* data1  = PE7  */
-        (((pe >>  6) & 1U) <<  2) |   /* data2  = PE6  */
-        (((pe >>  5) & 1U) <<  3) |   /* data3  = PE5  */
-        (((pe >>  4) & 1U) <<  4) |   /* data4  = PE4  */
-        (((pf >>  1) & 1U) <<  5) |   /* data5  = PF1  */
-        (((pf >>  0) & 1U) <<  6) |   /* data6  = PF0  */
-        (((pd >>  3) & 1U) <<  7) |   /* data7  = PD3  */
-        (((pd >>  4) & 1U) <<  8) |   /* data8  = PD4  */
-        (((pe >> 10) & 1U) <<  9) |   /* data9  = PE10 */
-        (((pe >>  0) & 1U) << 10) |   /* data10 = PE0  */
-        (((pe >> 15) & 1U) << 11) |   /* data11 = PE15 */
-        (((pe >>  2) & 1U) << 12) |   /* data12 = PE2  */
-        (((pe >> 12) & 1U) << 13)     /* data13 = PE12 */
-    ) & PLINK_ADC_MASK;
+    return (uint16_t)((((pe >> 8) & 1U) << 0) |   /* data0  = PE8  */
+                      (((pe >> 7) & 1U) << 1) |   /* data1  = PE7  */
+                      (((pe >> 6) & 1U) << 2) |   /* data2  = PE6  */
+                      (((pe >> 5) & 1U) << 3) |   /* data3  = PE5  */
+                      (((pe >> 4) & 1U) << 4) |   /* data4  = PE4  */
+                      (((pf >> 1) & 1U) << 5) |   /* data5  = PF1  */
+                      (((pf >> 0) & 1U) << 6) |   /* data6  = PF0  */
+                      (((pd >> 3) & 1U) << 7) |   /* data7  = PD3  */
+                      (((pd >> 4) & 1U) << 8) |   /* data8  = PD4  */
+                      (((pe >> 10) & 1U) << 9) |  /* data9  = PE10 */
+                      (((pe >> 0) & 1U) << 10) |  /* data10 = PE0  */
+                      (((pe >> 15) & 1U) << 11) | /* data11 = PE15 */
+                      (((pe >> 2) & 1U) << 12) |  /* data12 = PE2  */
+                      (((pe >> 12) & 1U) << 13)   /* data13 = PE12 */
+                      ) &
+           PLINK_ADC_MASK;
 }
 
 /*
@@ -143,8 +159,10 @@ static void set_data_dir(bool output)
 
 static int wait_not_busy(uint8_t addr, int rw)
 {
-    for (uint32_t elapsed = 0; gpio_pin_get_dt(&s_busy) != 0; elapsed++) {
-        if (elapsed >= BUSY_TIMEOUT_US) {
+    for (uint32_t elapsed = 0; gpio_pin_get_dt(&s_busy) != 0; elapsed++)
+    {
+        if (elapsed >= BUSY_TIMEOUT_US)
+        {
             LOG_ERR("BUSY timeout (addr=0x%X rw=%d)", addr, rw);
             return -EIO;
         }
@@ -161,7 +179,7 @@ static int wait_not_busy(uint8_t addr, int rw)
 static uint16_t read_nolock(uint8_t addr)
 {
     write_addr_rw(addr, 0);
-    k_busy_wait(1);                   /* propagation: FPGA drives bus combinationally */
+    k_busy_wait(1); /* propagation: FPGA drives bus combinationally */
     return read_data_bus();
 }
 
@@ -177,8 +195,12 @@ static int write_nolock(uint8_t addr, uint16_t value)
     write_addr_rw(addr, 1);
     k_busy_wait(1);
     gpio_pin_set_dt(&s_req, 1);
+    k_busy_wait(REQ_PULSE_US);
     int ret = wait_not_busy(addr, 1);
     gpio_pin_set_dt(&s_req, 0);
+    /* Keep the bus driven while the synchronized write is consumed, then
+     * guarantee a distinct low REQ interval before any following write. */
+    k_busy_wait(REQ_GUARD_US);
     set_data_dir(false);
     return ret;
 }
@@ -217,44 +239,82 @@ int parallel_link_init(void)
     int ret;
     k_mutex_init(&s_bus_mutex);
 
-    if (!gpio_is_ready_dt(&s_areset_n)) { LOG_ERR("ARESET_N not ready"); return -ENODEV; }
+    if (!gpio_is_ready_dt(&s_areset_n))
+    {
+        LOG_ERR("ARESET_N not ready");
+        return -ENODEV;
+    }
     ret = gpio_pin_configure_dt(&s_areset_n, GPIO_OUTPUT_ACTIVE);
-    if (ret) return ret;
+    if (ret)
+        return ret;
     gpio_pin_set_dt(&s_areset_n, 1);
 
-    for (int i = 0; i < 3; i++) {
-        if (!gpio_is_ready_dt(&s_ctrl[i])) { LOG_ERR("CTRL[%d] not ready", i); return -ENODEV; }
+    for (int i = 0; i < 3; i++)
+    {
+        if (!gpio_is_ready_dt(&s_ctrl[i]))
+        {
+            LOG_ERR("CTRL[%d] not ready", i);
+            return -ENODEV;
+        }
         ret = gpio_pin_configure_dt(&s_ctrl[i], GPIO_OUTPUT_INACTIVE);
-        if (ret) return ret;
+        if (ret)
+            return ret;
     }
 
-    if (!gpio_is_ready_dt(&s_rw)) { LOG_ERR("RW not ready"); return -ENODEV; }
+    if (!gpio_is_ready_dt(&s_rw))
+    {
+        LOG_ERR("RW not ready");
+        return -ENODEV;
+    }
     ret = gpio_pin_configure_dt(&s_rw, GPIO_OUTPUT_INACTIVE);
-    if (ret) return ret;
+    if (ret)
+        return ret;
 
-    if (!gpio_is_ready_dt(&s_req)) { LOG_ERR("REQ not ready"); return -ENODEV; }
+    if (!gpio_is_ready_dt(&s_req))
+    {
+        LOG_ERR("REQ not ready");
+        return -ENODEV;
+    }
     ret = gpio_pin_configure_dt(&s_req, GPIO_OUTPUT_INACTIVE);
-    if (ret) return ret;
+    if (ret)
+        return ret;
 
-    if (!gpio_is_ready_dt(&s_inc)) { LOG_ERR("INC not ready"); return -ENODEV; }
+    if (!gpio_is_ready_dt(&s_inc))
+    {
+        LOG_ERR("INC not ready");
+        return -ENODEV;
+    }
     ret = gpio_pin_configure_dt(&s_inc, GPIO_OUTPUT_INACTIVE);
-    if (ret) return ret;
+    if (ret)
+        return ret;
 
     /* Data bus starts as input — FPGA drives it during reads */
-    for (int i = 0; i < 14; i++) {
-        if (!gpio_is_ready_dt(&s_data[i])) { LOG_ERR("DATA[%d] not ready", i); return -ENODEV; }
+    for (int i = 0; i < 14; i++)
+    {
+        if (!gpio_is_ready_dt(&s_data[i]))
+        {
+            LOG_ERR("DATA[%d] not ready", i);
+            return -ENODEV;
+        }
         ret = gpio_pin_configure_dt(&s_data[i], GPIO_INPUT);
-        if (ret) return ret;
+        if (ret)
+            return ret;
     }
 
-    if (!gpio_is_ready_dt(&s_busy)) { LOG_ERR("BUSY not ready"); return -ENODEV; }
+    if (!gpio_is_ready_dt(&s_busy))
+    {
+        LOG_ERR("BUSY not ready");
+        return -ENODEV;
+    }
     ret = gpio_pin_configure_dt(&s_busy, GPIO_INPUT);
-    if (ret) return ret;
+    if (ret)
+        return ret;
 
 #ifdef CONFIG_PLINK_DEBUG
-    uint8_t build = (uint8_t)(read_nolock(PLINK_ADDR_BUILD)   & 0xFFU);
-    uint8_t ver   = (uint8_t)(read_nolock(PLINK_ADDR_VERSION) & 0xFFU);
-    if (build != PLINK_BUILD_EXPECTED || ver != PLINK_VERSION_EXPECTED) {
+    uint8_t build = (uint8_t)(read_nolock(PLINK_ADDR_BUILD) & 0xFFU);
+    uint8_t ver = (uint8_t)(read_nolock(PLINK_ADDR_VERSION) & 0xFFU);
+    if (build != PLINK_BUILD_EXPECTED || ver != PLINK_VERSION_EXPECTED)
+    {
         LOG_ERR("FPGA ID mismatch: build=0x%02X ver=0x%02X", build, ver);
         return -EIO;
     }
@@ -289,40 +349,101 @@ uint8_t parallel_link_read_status(void)
 int parallel_link_reset(void)
 {
     int ret = gpio_pin_set_dt(&s_areset_n, 0);
-    if (ret) { LOG_ERR("Failed to assert reset: %d", ret); return ret; }
+    if (ret)
+    {
+        LOG_ERR("Failed to assert reset: %d", ret);
+        return ret;
+    }
     k_busy_wait(RESET_PULSE_US);
     ret = gpio_pin_set_dt(&s_areset_n, 1);
-    if (ret) { LOG_ERR("Failed to de-assert reset: %d", ret); return ret; }
+    if (ret)
+    {
+        LOG_ERR("Failed to de-assert reset: %d", ret);
+        return ret;
+    }
     k_busy_wait(100);
     LOG_INF("FPGA reset pulsed");
     return 0;
 }
 
+static int write_sample_size_reg(void)
+{
+    uint16_t value = (uint16_t)s_sample_size_exp | ((uint16_t)s_pretrigger_field << PLINK_SAMPLE_SIZE_PRETRIG_SHIFT);
+    return parallel_link_write(PLINK_ADDR_SAMPLE_SIZE, value);
+}
+
 int parallel_link_set_sample_size(uint16_t count)
 {
-    if (count == 0 || count > 8192U || (count & (count - 1U)) != 0U) {
+    if (count == 0 || count > 8192U || (count & (count - 1U)) != 0U)
+    {
         LOG_ERR("sample_size: %u is not a power-of-2 in [1, 8192]", count);
         return -EINVAL;
     }
+    uint16_t pretrigger = configured_pretrigger_count();
+    if (pretrigger != 0U && pretrigger >= count)
+    {
+        LOG_ERR("sample_size: %u must exceed configured pretrigger %u", count, pretrigger);
+        return -EINVAL;
+    }
     uint8_t exp = 0;
-    uint16_t v  = count;
-    while (v > 1U) { v >>= 1; exp++; }
-    return parallel_link_write(PLINK_ADDR_SAMPLE_SIZE, exp);
+    uint16_t v = count;
+    while (v > 1U)
+    {
+        v >>= 1;
+        exp++;
+    }
+    s_sample_size_exp = exp;
+    return write_sample_size_reg();
 }
 
-int parallel_link_acquire(uint16_t *ch1, uint16_t *ch2, uint16_t count,
-                          uint32_t timeout_ms)
+int parallel_link_set_pretrigger(uint16_t count)
 {
-    int64_t  deadline   = k_uptime_get() + (int64_t)timeout_ms;
+    if (count > PLINK_PRETRIGGER_MAX || (count != 0 && (count & (count - 1U)) != 0U))
+    {
+        LOG_ERR("pretrigger: %u is not 0 or a power of two in [1, %u]", count, PLINK_PRETRIGGER_MAX);
+        return -EINVAL;
+    }
+    if (count != 0U && count >= configured_sample_size())
+    {
+        LOG_ERR("pretrigger: %u must be smaller than sample size %u", count, configured_sample_size());
+        return -EINVAL;
+    }
+    uint8_t field = 0;
+    if (count != 0)
+    {
+        uint8_t exp = 0;
+        uint16_t v = count;
+        while (v > 1U)
+        {
+            v >>= 1;
+            exp++;
+        }
+        field = (uint8_t)(exp + 1U);
+        if (field > PLINK_SAMPLE_SIZE_PRETRIG_MASK)
+        {
+            LOG_ERR("pretrigger: %u too large to encode", count);
+            return -EINVAL;
+        }
+    }
+    s_pretrigger_field = field;
+    return write_sample_size_reg();
+}
+
+int parallel_link_acquire(uint16_t *ch1, uint16_t *ch2, uint16_t count, uint32_t timeout_ms)
+{
+    int64_t deadline = k_uptime_get() + (int64_t)timeout_ms;
     uint32_t poll_count = 0;
 
-    while (true) {
+    while (true)
+    {
         uint8_t status = (uint8_t)(read_nolock(PLINK_ADDR_STATUS) & 0xFFU);
         if (poll_count % 1000U == 0U)
             LOG_DBG("acquire: poll=%u STATUS=0x%02x", poll_count, status);
         poll_count++;
-        if (status & PLINK_STATUS_BATCH_RDY) break;
-        if (k_uptime_get() >= deadline) {
+        if (status & PLINK_STATUS_BATCH_RDY)
+            break;
+        if (k_uptime_get() >= deadline)
+        {
             LOG_ERR("acquire: timeout after %u ms (STATUS=0x%02x)", timeout_ms, status);
             return -ETIMEDOUT;
         }
@@ -337,11 +458,12 @@ int parallel_link_acquire(uint16_t *ch1, uint16_t *ch2, uint16_t count,
      * Hold mutex for the whole loop to avoid interleaved transactions.
      */
     k_mutex_lock(&s_bus_mutex, K_FOREVER);
-    for (uint16_t i = 0; i < count; i++) {
+    for (uint16_t i = 0; i < count; i++)
+    {
         ch1[i] = read_nolock(PLINK_ADDR_CH1);
         ch2[i] = read_nolock(PLINK_ADDR_CH2);
         if (i < count - 1U)
-            inc_nolock();   /* advance to next sample pair */
+            inc_nolock(); /* advance to next sample pair */
     }
     k_mutex_unlock(&s_bus_mutex);
 
