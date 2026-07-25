@@ -335,7 +335,10 @@ int afe_manager_setOffset(const afe_manager_channel_t channel, const float perce
             break;
         }
 
-        rawValue = afe_manager_encodeDac(percent);
+        /* The analog offset path is inverting: preserve the external
+         * 0..100% control convention while driving the DAC with its inverse.
+         * 50% remains the centred (0 V) setting. */
+        rawValue = afe_manager_encodeDac(100.0f - percent);
 
         absoluteChannel = (channel == AFE_MANAGER_CH1) ? AFE_MANGER_DAC_OFFSET_CH1 : AFE_MANGER_DAC_OFFSET_CH2;
 
