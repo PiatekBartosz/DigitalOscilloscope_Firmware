@@ -216,6 +216,23 @@ int afe_manager_init(void)
             break;
         }
 
+        errorCode = afe_manager_setAttenuation(AFE_MANAGER_CH1, afe_manager_state.ch[0].attenuation);
+        if (errorCode == 0)
+            errorCode = afe_manager_setAttenuation(AFE_MANAGER_CH2, afe_manager_state.ch[1].attenuation);
+        if (errorCode == 0)
+            errorCode = afe_manager_setCoupling(AFE_MANAGER_CH1, afe_manager_state.ch[0].coupling);
+        if (errorCode == 0)
+            errorCode = afe_manager_setCoupling(AFE_MANAGER_CH2, afe_manager_state.ch[1].coupling);
+        if (errorCode == 0)
+            errorCode = afe_manager_setTriggerSource(afe_manager_state.trigger_source);
+        if (errorCode == 0)
+            errorCode = afe_manager_setInterleaved(afe_manager_state.interleaved);
+        if (errorCode != 0)
+        {
+            LOG_ERR("Failed applying AFE GPIO power-on state: %d", errorCode);
+            break;
+        }
+
         /* Sync hardware DAC to the power-on shadow values. */
         const uint8_t dac_map[4] = {
             AFE_MANGER_DAC_GAIN_CH1,
