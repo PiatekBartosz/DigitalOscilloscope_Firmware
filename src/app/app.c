@@ -9,7 +9,7 @@
 LOG_MODULE_REGISTER(app, CONFIG_APP_LOG_LEVEL);
 
 #define APP_DEFAULT_FPGA_CTRL   PLINK_CTRL_CAPTURE_EN /* capture on, trigger/mock off, decim=1 */
-#define APP_DEFAULT_SAMPLE_SIZE 8192U
+#define APP_DEFAULT_SAMPLE_SIZE PLINK_SAMPLE_COUNT_MAX
 #define APP_DEFAULT_PRETRIGGER  0U
 
 /* Shadow of the full 14-bit FPGA CTRL register. */
@@ -110,7 +110,7 @@ int app_set_decim_factor(uint16_t factor)
             break;
         }
 
-        s_fpga_ctrl = (s_fpga_ctrl & 0x000FU) | PLINK_CTRL_DECIM(factor);
+        s_fpga_ctrl = (s_fpga_ctrl & PLINK_CTRL_FLAGS_MASK) | PLINK_CTRL_DECIM(factor);
         LOG_INF("Decimation factor set to %u (ctrl=0x%04X)", factor, s_fpga_ctrl);
         ret = parallel_link_write(PLINK_ADDR_CTRL, s_fpga_ctrl);
     } while (false);

@@ -50,7 +50,7 @@ typedef struct afe_manager_state_s
     afe_manager_channel_state_t ch[2]; /* index 0 = CH1, 1 = CH2 */
     afe_manager_channel_t trigger_source;
     float trigger_level_percent;
-    bool interleaved;
+    bool ch1_to_adc2;
 } afe_manager_state_t;
 
 int afe_manager_init(void);
@@ -62,7 +62,7 @@ int afe_manager_setCoupling(const afe_manager_channel_t channel, const afe_manag
 int afe_manager_setAdcRange(const afe_manager_channel_t channel, const afe_manager_adc_range_t range);
 int afe_manager_setTriggerSource(const afe_manager_channel_t channel);
 int afe_manager_setTriggerLevel(const float percent);
-int afe_manager_setInterleaved(const bool isInterleaved);
+int afe_manager_setCh1ToAdc2(const bool enable);
 
 /* Voltage applied to the analog trigger comparator threshold input. */
 float afe_manager_getTriggerLevelVoltage(void);

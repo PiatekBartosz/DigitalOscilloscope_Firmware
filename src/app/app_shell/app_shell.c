@@ -304,7 +304,7 @@ static int app_shell_cmdAfeTriggerCh(const struct shell *shell, size_t argc, cha
     return errorCode;
 }
 
-static int app_shell_cmdAfeInterleaved(const struct shell *shell, size_t argc, char **argv)
+static int app_shell_cmdAfeCh1ToAdc2(const struct shell *shell, size_t argc, char **argv)
 {
     app_shell_debugPrintCmd(shell, argc, argv);
 
@@ -322,14 +322,14 @@ static int app_shell_cmdAfeInterleaved(const struct shell *shell, size_t argc, c
             break;
         }
 
-        errorCode = afe_manager_setInterleaved(value ? true : false);
+        errorCode = afe_manager_setCh1ToAdc2(value ? true : false);
         if (errorCode != 0)
         {
-            shell_error(shell, "Failed to set interleaved (%d)", errorCode);
+            shell_error(shell, "Failed to set CH1-to-ADC2 (%d)", errorCode);
             break;
         }
 
-        shell_print(shell, "Interleaved %s", value ? "enabled" : "disabled");
+        shell_print(shell, "CH1-to-ADC2 %s", value ? "enabled" : "disabled");
 
     } while (0);
 
@@ -415,9 +415,9 @@ static int app_shell_cmdAfeSampleSize(const struct shell *shell, size_t argc, ch
     app_shell_debugPrintCmd(shell, argc, argv);
 
     int value = atoi(argv[1]);
-    if (value <= 0 || value > 8192)
+    if (value <= 0 || value > PLINK_SAMPLE_COUNT_MAX)
     {
-        shell_error(shell, "Count must be a power of two in [1, 8192]");
+        shell_error(shell, "Count must be a power of two in [1, %u]", PLINK_SAMPLE_COUNT_MAX);
         return -EINVAL;
     }
 
@@ -463,7 +463,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
     SHELL_CMD_ARG(trigger_ch, NULL, "trigger_ch <1|2>", app_shell_cmdAfeTriggerCh, 2, 0),
     SHELL_CMD_ARG(trigger_level, NULL, "trigger_level <percent 0..100>", app_shell_cmdAfeTriggerLevel, 2, 0),
     SHELL_CMD_ARG(trigger_mode, NULL, "trigger_mode <off|normal>", app_shell_cmdAfeTriggerMode, 2, 0),
-    SHELL_CMD_ARG(interleaved, NULL, "interleaved <0|1>", app_shell_cmdAfeInterleaved, 2, 0),
+    SHELL_CMD_ARG(ch1_to_adc2, NULL, "ch1_to_adc2 <0|1>", app_shell_cmdAfeCh1ToAdc2, 2, 0),
     SHELL_CMD_ARG(mock_adc, NULL, "mock_adc <0|1>", app_shell_cmdAfeMockAdc, 2, 0),
     SHELL_CMD_ARG(sample_size, NULL, "sample_size <count> (power of 2, 1..8192)", app_shell_cmdAfeSampleSize, 2, 0),
     SHELL_CMD_ARG(pretrigger, NULL, "pretrigger <count> (0=disabled, power of 2, <=4096)", app_shell_cmdAfePretrigger,

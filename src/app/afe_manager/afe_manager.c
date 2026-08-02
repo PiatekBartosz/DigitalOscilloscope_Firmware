@@ -37,7 +37,7 @@ typedef struct afe_manager_config_s
     const struct gpio_dt_spec couplingCh1Gpio;
     const struct gpio_dt_spec couplingCh2Gpio;
     const struct gpio_dt_spec triggerSourceGpio;
-    const struct gpio_dt_spec interleavedGpio;
+    const struct gpio_dt_spec ch1ToAdc2Gpio;
 
 } afe_manager_config_t;
 
@@ -54,7 +54,7 @@ static afe_manager_state_t afe_manager_state = {
               .adc_range_vpp = AFE_MANAGER_ADC_RANGE_2_VPP},
     .trigger_source = AFE_MANAGER_CH1,
     .trigger_level_percent = AFE_MANAGER_DEFAULT_TRIGGER_LEVEL_PERCENT,
-    .interleaved = false,
+    .ch1_to_adc2 = false,
 };
 
 static afe_manager_config_t afe_manager_config = {
@@ -68,7 +68,7 @@ static afe_manager_config_t afe_manager_config = {
 
     .triggerSourceGpio = GPIO_DT_SPEC_GET(DT_NODELABEL(trigger_source), gpios),
 
-    .interleavedGpio = GPIO_DT_SPEC_GET(DT_NODELABEL(interleaved), gpios),
+    .ch1ToAdc2Gpio = GPIO_DT_SPEC_GET(DT_NODELABEL(interleaved), gpios),
 };
 
 static int afe_manager_initGpio(void)
@@ -78,7 +78,7 @@ static int afe_manager_initGpio(void)
     const struct gpio_dt_spec *gpios[] = {
         &afe_manager_config.attenuationCh1Gpio, &afe_manager_config.attenuationCh2Gpio,
         &afe_manager_config.couplingCh1Gpio,    &afe_manager_config.couplingCh2Gpio,
-        &afe_manager_config.triggerSourceGpio,  &afe_manager_config.interleavedGpio};
+        &afe_manager_config.triggerSourceGpio,  &afe_manager_config.ch1ToAdc2Gpio};
     do
     {
         for (size_t i = 0; i < ARRAY_SIZE(gpios); i++)
@@ -226,7 +226,7 @@ int afe_manager_init(void)
         if (errorCode == 0)
             errorCode = afe_manager_setTriggerSource(afe_manager_state.trigger_source);
         if (errorCode == 0)
-            errorCode = afe_manager_setInterleaved(afe_manager_state.interleaved);
+            errorCode = afe_manager_setCh1ToAdc2(afe_manager_state.ch1_to_adc2);
         if (errorCode != 0)
         {
             LOG_ERR("Failed applying AFE GPIO power-on state: %d", errorCode);
@@ -508,20 +508,20 @@ float afe_manager_getTriggerLevelVoltage(void)
                                                   afe_manager_state.trigger_level_percent);
 }
 
-int afe_manager_setInterleaved(const bool isInterleaved)
+int afe_manager_setCh1ToAdc2(const bool enable)
 {
     int errorCode = 0;
 
     do
     {
-        errorCode = gpio_pin_set_dt(&afe_manager_config.interleavedGpio, isInterleaved ? 1 : 0);
+        errorCode = gpio_pin_set_dt(&afe_manager_config.ch1ToAdc2Gpio, enable ? 1 : 0);
         if (errorCode != 0)
         {
-            LOG_ERR("Failed to set interleaved gpio, error: %d", errorCode);
+            LOG_ERR("Failed to set CH1-to-ADC2 GPIO, error: %d", errorCode);
             break;
         }
 
-        afe_manager_state.interleaved = isInterleaved;
+        afe_manager_state.ch1_to_adc2 = enable;
 
     } while (0);
 

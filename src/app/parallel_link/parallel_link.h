@@ -8,7 +8,7 @@
  * Reads and writes share the same address space; rw pin selects direction.
  */
 #define PLINK_ADDR_BUILD       0x0U /* read: build number (0x89)          */
-#define PLINK_ADDR_VERSION     0x1U /* read: version      (0x07)          */
+#define PLINK_ADDR_VERSION     0x1U /* read: version      (0x08)          */
 #define PLINK_ADDR_CH1         0x2U /* read: CH1 sample [13:0]            */
 #define PLINK_ADDR_CH2         0x3U /* read: CH2 sample [13:0]            */
 #define PLINK_ADDR_STATUS      0x4U /* read: status flags                 */
@@ -20,6 +20,7 @@
 #define PLINK_CTRL_MOCK_EN     (1U << 1)
 #define PLINK_CTRL_RESET_FIFO  (1U << 2)
 #define PLINK_CTRL_TRIGGER_EN  (1U << 3)
+#define PLINK_CTRL_FLAGS_MASK  (PLINK_CTRL_CAPTURE_EN | PLINK_CTRL_MOCK_EN | PLINK_CTRL_RESET_FIFO | PLINK_CTRL_TRIGGER_EN)
 
 /* Decimation factor packed in CTRL bits [13:4].  0 and 1 both mean no decimation. */
 #define PLINK_CTRL_DECIM_SHIFT     4U
@@ -39,10 +40,12 @@
 #define PLINK_SAMPLE_SIZE_PRETRIG_SHIFT 4U
 #define PLINK_SAMPLE_SIZE_PRETRIG_MASK  0xFU
 #define PLINK_PRETRIGGER_MAX            4096U
+#define PLINK_SAMPLE_COUNT_MAX           8192U
 
 #define PLINK_ADC_MASK                  0x3FFFU /* 14-bit mask                   */
+#define PLINK_REGISTER_BYTE_MASK        0xFFU
 #define PLINK_BUILD_EXPECTED            0x89U
-#define PLINK_VERSION_EXPECTED          0x07U
+#define PLINK_VERSION_EXPECTED          0x08U
 
 /*
  * Initialise GPIOs and verify FPGA identity.

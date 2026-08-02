@@ -29,6 +29,11 @@ DNS_SD_REGISTER_TCP_SERVICE(osc_dns_sd, CONFIG_NET_HOSTNAME, "_oscilloscope._tcp
 #define FRAME_HDR_LEN   8U
 #define FRAME_SMPL_LEN  (WAVEFORM_SAMPLES * 4U)
 #define FRAME_TOTAL_LEN (FRAME_HDR_LEN + FRAME_SMPL_LEN)
+#define STATUS_REPLY_WORST_CASE_LEN 529U
+#define STATUS_REPLY_MAX_LEN 640U
+
+BUILD_ASSERT(STATUS_REPLY_MAX_LEN >= STATUS_REPLY_WORST_CASE_LEN,
+             "STATUS reply buffer cannot hold the complete status line");
 
 /* Static buffers — too large for the stack. */
 static uint16_t s_ch1[WAVEFORM_SAMPLES];
@@ -50,8 +55,8 @@ static bool send_waveform(int fd, uint16_t count)
 {
     uint32_t frame_len = FRAME_HDR_LEN + (uint32_t)count * 4U;
 
-    s_tx_buf[0] = 0xADU;
-    s_tx_buf[1] = 0xC1U;
+    s_tx_buf[0] = WAVEFORM_FRAME_SYNC_0;
+    s_tx_buf[1] = WAVEFORM_FRAME_SYNC_1;
     s_tx_buf[2] = (uint8_t)(s_wf_seq >> 24);
     s_tx_buf[3] = (uint8_t)(s_wf_seq >> 16);
     s_tx_buf[4] = (uint8_t)(s_wf_seq >> 8);
@@ -106,7 +111,10 @@ static void handle_command(int fd, char *line)
      * desktop UI, a TCP terminal, and a bring-up log without another parser. */
     if (strcmp(tokens[0], "status") == 0 && n == 1)
     {
-        char reply[512];
+        /* The full status line is currently bounded by
+         * STATUS_REPLY_WORST_CASE_LEN bytes. Keep
+         * headroom for future fields and avoid silently truncating it. */
+        char reply[STATUS_REPLY_MAX_LEN];
         afe_manager_state_t afe = afe_manager_getState();
         uint8_t fpga_status = app_get_fpga_status();
         uint8_t build = parallel_link_read_byte(PLINK_ADDR_BUILD);
@@ -133,7 +141,7 @@ static void handle_command(int fd, char *line)
                  "afe_ch2_gain_pct=%u.%02u afe_ch2_offset_pct=%u.%02u "
                  "afe_ch2_atten=1:%u afe_ch2_coupling=%s afe_ch2_range_vpp=%u "
                  "afe_trigger_source=%u afe_trigger_level_pct=%u.%02u "
-                 "afe_trigger_level_mv=%u interleaved=%u\n",
+                 "afe_trigger_level_mv=%u ch1_to_adc2=%u\n",
                  build, version, app_get_sample_size(), app_get_pretrigger(), app_get_decim_factor(),
                  app_get_trigger_mode() ? "normal" : "off", app_get_mock_adc() ? 1U : 0U, fpga_status,
                  (fpga_status & PLINK_STATUS_BATCH_RDY) ? 1U : 0U, (fpga_status & PLINK_STATUS_FIFO_OVF) ? 1U : 0U,
@@ -146,7 +154,7 @@ static void handle_command(int fd, char *line)
                  afe.ch[1].attenuation == AFE_MANAGER_ATTEN_1_TO_100 ? 100U : 1U,
                  afe.ch[1].coupling == AFE_MANAGER_COUPLING_DC ? "dc" : "ac", (uint32_t)afe.ch[1].adc_range_vpp,
                  afe.trigger_source, (uint32_t)(afe.trigger_level_percent * 100.0f + 0.5f) / 100U,
-                 (uint32_t)(afe.trigger_level_percent * 100.0f + 0.5f) % 100U, trigger_mv, afe.interleaved ? 1U : 0U);
+                 (uint32_t)(afe.trigger_level_percent * 100.0f + 0.5f) % 100U, trigger_mv, afe.ch1_to_adc2 ? 1U : 0U);
         send_reply(fd, reply);
         return;
     }
@@ -311,12 +319,12 @@ static void handle_command(int fd, char *line)
         float pct = strtof(tokens[2], NULL);
         ret = afe_manager_setTriggerLevel(pct);
     }
-    else if (strcmp(sub, "interleaved") == 0 && n == 3)
+    else if (strcmp(sub, "ch1_to_adc2") == 0 && n == 3)
     {
         int val = atoi(tokens[2]);
         if (val == 0 || val == 1)
         {
-            ret = afe_manager_setInterleaved(val != 0);
+            ret = afe_manager_setCh1ToAdc2(val != 0);
         }
     }
     else if (strcmp(sub, "mock_adc") == 0 && n == 3)
@@ -330,7 +338,7 @@ static void handle_command(int fd, char *line)
     else if (strcmp(sub, "sample_size") == 0 && n == 3)
     {
         int val = atoi(tokens[2]);
-        if (val > 0 && val <= 8192)
+        if (val > 0 && val <= PLINK_SAMPLE_COUNT_MAX)
         {
             ret = app_set_sample_size((uint16_t)val);
         }

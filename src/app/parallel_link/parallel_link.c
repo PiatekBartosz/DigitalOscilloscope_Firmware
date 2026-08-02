@@ -346,8 +346,8 @@ int parallel_link_init(void)
         }
 
 #ifdef CONFIG_PLINK_DEBUG
-        uint8_t build = (uint8_t)(read_nolock(PLINK_ADDR_BUILD) & 0xFFU);
-        uint8_t ver = (uint8_t)(read_nolock(PLINK_ADDR_VERSION) & 0xFFU);
+        uint8_t build = (uint8_t)(read_nolock(PLINK_ADDR_BUILD) & PLINK_REGISTER_BYTE_MASK);
+        uint8_t ver = (uint8_t)(read_nolock(PLINK_ADDR_VERSION) & PLINK_REGISTER_BYTE_MASK);
         if (build != PLINK_BUILD_EXPECTED || ver != PLINK_VERSION_EXPECTED)
         {
             LOG_ERR("FPGA ID mismatch: build=0x%02X ver=0x%02X", build, ver);
@@ -371,7 +371,7 @@ int parallel_link_write(uint8_t addr, uint16_t value)
 
 uint8_t parallel_link_read_byte(uint8_t addr)
 {
-    return (uint8_t)(read_sample(addr) & 0xFFU);
+    return (uint8_t)(read_sample(addr) & PLINK_REGISTER_BYTE_MASK);
 }
 
 uint16_t parallel_link_read_sample(uint8_t addr)
@@ -381,7 +381,7 @@ uint16_t parallel_link_read_sample(uint8_t addr)
 
 uint8_t parallel_link_read_status(void)
 {
-    return (uint8_t)(read_sample(PLINK_ADDR_STATUS) & 0xFFU);
+    return (uint8_t)(read_sample(PLINK_ADDR_STATUS) & PLINK_REGISTER_BYTE_MASK);
 }
 
 int parallel_link_reset(void)
@@ -421,9 +421,9 @@ int parallel_link_set_sample_size(uint16_t count)
 
     do
     {
-        if (count == 0 || count > 8192U || (count & (count - 1U)) != 0U)
+        if (count == 0 || count > PLINK_SAMPLE_COUNT_MAX || (count & (count - 1U)) != 0U)
         {
-            LOG_ERR("sample_size: %u is not a power-of-2 in [1, 8192]", count);
+            LOG_ERR("sample_size: %u is not a power-of-2 in [1, %u]", count, PLINK_SAMPLE_COUNT_MAX);
             ret = -EINVAL;
             break;
         }
@@ -501,7 +501,7 @@ int parallel_link_acquire(uint16_t *ch1, uint16_t *ch2, uint16_t count, uint32_t
     {
         while (true)
         {
-            uint8_t status = (uint8_t)(read_nolock(PLINK_ADDR_STATUS) & 0xFFU);
+            uint8_t status = (uint8_t)(read_nolock(PLINK_ADDR_STATUS) & PLINK_REGISTER_BYTE_MASK);
             if (poll_count % 1000U == 0U)
                 LOG_DBG("acquire: poll=%u STATUS=0x%02x", poll_count, status);
             poll_count++;
